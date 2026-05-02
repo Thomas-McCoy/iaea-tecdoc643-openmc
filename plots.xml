@@ -1,0 +1,51 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<plots>
+  <plot id="1" filename="plot_xy_midplane" color_by="material" type="slice" basis="xy">
+    <pixels>1400 1600</pixels>
+    <origin>0.0 0.0 0.0</origin>
+    <width>70.0 80.0</width>
+    <color id="1" rgb="220 60 60"/>
+    <color id="2" rgb="200 200 200"/>
+    <color id="3" rgb="135 206 250"/>
+    <color id="4" rgb="30 100 60"/>
+    <color id="5" rgb="80 80 80"/>
+    <color id="6" rgb="180 180 200"/>
+    <color id="7" rgb="255 255 255"/>
+  </plot>
+  <plot id="2" filename="plot_xz_side" color_by="material" type="slice" basis="xz">
+    <pixels>1400 1800</pixels>
+    <origin>0.0 0.0 0.0</origin>
+    <width>70.0 90.0</width>
+    <color id="1" rgb="220 60 60"/>
+    <color id="2" rgb="200 200 200"/>
+    <color id="3" rgb="135 206 250"/>
+    <color id="4" rgb="30 100 60"/>
+    <color id="5" rgb="80 80 80"/>
+    <color id="6" rgb="180 180 200"/>
+    <color id="7" rgb="255 255 255"/>
+  </plot>
+  <plot id="3" filename="plot_yz_front" color_by="material" type="slice" basis="yz">
+    <pixels>1600 1800</pixels>
+    <origin>0.0 0.0 0.0</origin>
+    <width>80.0 90.0</width>
+    <color id="1" rgb="220 60 60"/>
+    <color id="2" rgb="200 200 200"/>
+    <color id="3" rgb="135 206 250"/>
+    <color id="4" rgb="30 100 60"/>
+    <color id="5" rgb="80 80 80"/>
+    <color id="6" rgb="180 180 200"/>
+    <color id="7" rgb="255 255 255"/>
+  </plot>
+  <plot id="4" filename="plot_xy_zoom_element" color_by="material" type="slice" basis="xy">
+    <pixels>1700 1800</pixels>
+    <origin>-3.85 0.0 0.0</origin>
+    <width>8.5 9.0</width>
+    <color id="1" rgb="220 60 60"/>
+    <color id="2" rgb="200 200 200"/>
+    <color id="3" rgb="135 206 250"/>
+    <color id="4" rgb="30 100 60"/>
+    <color id="5" rgb="80 80 80"/>
+    <color id="6" rgb="180 180 200"/>
+    <color id="7" rgb="255 255 255"/>
+  </plot>
+</plots>
