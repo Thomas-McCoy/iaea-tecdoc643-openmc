@@ -56,9 +56,9 @@ settings.run_mode = 'eigenvalue'   # criticality calculation
 #   particles=10000, batches=200, inactive=50
 # =============================================================================
 
-settings.particles  = 1000    # neutrons per batch (increase for production)
-settings.batches    = 50      # total batches
-settings.inactive   = 20      # discard first 20 batches (source convergence)
+settings.particles  = 10000    # neutrons per batch (increase for production)
+settings.batches    = 150      # total batches
+settings.inactive   = 50      # discard first 50 batches (source convergence)
 
 # =============================================================================
 # INITIAL FISSION SOURCE

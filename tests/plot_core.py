@@ -23,7 +23,7 @@ THIS_DIR  = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(THIS_DIR)
 sys.path.insert(0, os.path.join(REPO_ROOT, 'model'))
 
-from geometry import geometry, PITCH_X
+from geometry import geometry, PITCH_X, PITCH_Y
 from materials import (
     fuel, clad, water, hafnium, graphite, aluminum, air,
 )
@@ -42,6 +42,23 @@ colors = {
     hafnium:   ( 30, 100,  60),   # dark green
     air:       (255, 255, 255),   # white
 }
+
+# =============================================================================
+# Control element centers
+# =============================================================================
+# Based on the 8-column x 9-row core lattice.
+# These are global coordinates in cm.
+
+CONTROL_CENTERS = {
+    "C0": (-0.5 * PITCH_X,  2.0 * PITCH_Y),
+    "C1": ( 1.5 * PITCH_X,  1.0 * PITCH_Y),
+    "C2": (-1.5 * PITCH_X,  0.0 * PITCH_Y),
+    "C3": ( 1.5 * PITCH_X, -1.0 * PITCH_Y),
+    "C4": (-0.5 * PITCH_X, -2.0 * PITCH_Y),
+}
+
+CTRL_NAME = "C0"
+CTRL_X, CTRL_Y = CONTROL_CENTERS[CTRL_NAME]
 
 # =============================================================================
 # Build a 2x2 figure with one subplot per view.
@@ -89,16 +106,17 @@ axes[1, 0].set_title('YZ front (x = 0)')
 # --- XY zoom on a single fuel element ---
 # Lattice has 8 columns (even) -> origin x=0 falls between elements;
 # offset by half a pitch to land on a real element center.
+# --- XY zoom on a single control element ---
 geometry.plot(
     basis='xy',
-    origin=(-PITCH_X / 2.0, 0.0, 0.0),
-    width=(8.5, 9.0),
+    origin=(CTRL_X, CTRL_Y, 0.0),
+    width=(7.65, 8.05),
     pixels=(1700, 1800),
     color_by='material',
     colors=colors,
     axes=axes[1, 1],
 )
-axes[1, 1].set_title('XY zoom — single element')
+axes[1, 1].set_title(f'XY zoom — control element {CTRL_NAME}')
 
 plt.tight_layout()
 
