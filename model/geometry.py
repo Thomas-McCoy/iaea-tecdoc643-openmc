@@ -25,18 +25,15 @@ Standard Fuel Element (LEU, U3Si2-Al, heterogeneous build):
     - Inner clad:         0.38 mm   |   Outer clad: 0.495 mm
     - U density:          4.45 g/cm3 in meat   |   235U/elem: 390 g
 
-Dimensional reconciliation (Option 1):
-    The TECDOC numbers give 23 plates × 1.27 mm + 22 channels × 2.19 mm =
-    77.39 mm of active region width — exceeding the 66.4 mm available
-    between the 4.8 mm side plates. To get a self-consistent heterogeneous
-    geometry that fills the 7.7 cm lattice pitch with no overlaps or
-    undefined regions, we preserve plate thicknesses, meat dimensions, and
-    side plates, and solve for the water channel thickness:
-        N*t_plate + (N-1)*t_chan = active_width
-    → t_chan ≈ 1.692 mm (vs nominal 2.19 mm, ~23% reduction)
-    Effect: slightly harder neutron spectrum; ~100-300 pcm keff bias
-    relative to published homogenized TECDOC results. Acceptable for
-    OpenMC <-> MCNP cross-comparison since both codes use the same model.
+Dimensional reconciliation:
+    The 23-plate stack (21 inner plates x 1.27 mm + 2 outer plates x
+    1.385 mm, each followed by a 2.19 mm water channel) sums to 77.62 mm
+    and stacks in Y, not X — the side plates only bound the meat-width
+    (X) direction and don't constrain how many plates fit. The stack
+    sits inside the 80 mm element height (ELEM_Y) with ~1.19 mm of water
+    on each end (the water_below_stack / water_above_stack cells), so
+    nominal TECDOC plate/channel dimensions are used as-is — no
+    reconciliation of the water channel thickness is needed.
 
 Axial extent inside element universes:
     Cells in the element universe are NOT bounded in z (the meat region IS,
@@ -724,7 +721,8 @@ graphite_univ = openmc.Universe(name='graphite_universe', cells=[graphite_cell])
 # =============================================================================
 
 std_elems  = [make_standard_fuel_element(i) for i in range(23)]
-ctrl_elems = [make_control_fuel_element(100 + i, blades_inserted=False)
+ctrl_inserted = [False, False, False, False, False]   # C0 C1 C2 C3 C4
+ctrl_elems = [make_control_fuel_element(100 + i, blades_inserted=ctrl_inserted[i])
               for i in range(5)]
 
 W = water_univ
@@ -738,9 +736,9 @@ lattice_universes = [
     [W, G, G, G, G, G, G, W],
     [W, S[0],  S[1],  C[0],  S[2],  S[3],  S[4],  W],
     [W, S[5],  S[6],  S[7],  S[8],  C[1],  S[9],  W],
-    [W, S[10], C[2],  S[11], F, S[12], S[13], W],
+    [W, S[10], C[2],  S[11], F,     S[12], S[13], W],
     [W, S[14], S[15], S[16], S[17], C[3],  S[18], W],
-    [W, F, S[19], C[4],  S[20], S[21], S[22], W],
+    [W, F,     S[19], C[4],  S[20], S[21], S[22], W],
     [W, G, G, G, G, G, G, W],
     [W, W, W, W, W, W, W, W],
 ]
