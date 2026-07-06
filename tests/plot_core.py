@@ -5,9 +5,9 @@ tests/plot_core.py
 
 The geometry here is rebuilt with the control blades FULLY INSERTED
 (withdrawn_fraction = 0.0) so the B4C absorber sits exactly in the active zone
-z = [-30, +30] with no extension above the fuel.  The production runs still use
-the module default (f = 0.4); this file only rebuilds a fresh f = 0 geometry for
-a clean plot.
+z = [-30, +30] with no extension above the fuel.  Production runs set the blade
+position through core.CoreConfig; this file only rebuilds a fresh f = 0
+geometry for a clean plot.
 
 Panel layout:
   [0,0] XY  z = 0      Full core top-down at fuel midplane (both flux traps marked).
@@ -91,7 +91,7 @@ def build_geometry(f=0.0):
     return openmc.Geometry(openmc.Universe(cells=[core_cell]))
 
 
-geometry = build_geometry(f=0.0)   # blades fully in
+geometry = build_geometry(f=1.0)   # blades fully in
 
 # =============================================================================
 # Colour map

@@ -47,7 +47,7 @@ All dimensions in cm.
 """
 
 import openmc
-from materials import fuel, clad, water, water_flux_trap, b4c, graphite, aluminum, air, end_box_homog
+from materials import fuel, clad, water, water_flux_trap, b4c, graphite, aluminum, end_box_homog
 
 # =============================================================================
 # LATTICE / ELEMENT ENVELOPE
@@ -337,13 +337,13 @@ def make_standard_fuel_element(elem_id):
 # =============================================================================
 # CONTROL ELEMENT
 # Architecture: two end sandwiches + central 17-plate fuel follower stack.
-#   Each end (from element face inward, per TECDOC-643 v2 p.32 Fig.2 + Table 1):
-#     [Al guide 0.127 | H₂O 0.268 | Hf/H₂O 0.310 | H₂O 0.243 | Al slider 0.127]
+#   Each end (from element face inward; end plates 1.50 mm per reference deck):
+#     [Al guide 0.150 | H₂O 0.245 | absorber slot 0.310 | H₂O 0.220 | Al slider 0.150]
 #     = 1.075 cm per end  (GUIDE_REGION)
 #   Fuel region: ELEM_Y - 2×1.075 = 5.85 cm; 17 plates at pitch 5.85/17.
 #
 # Fixed-length sliding blade:
-#   The Hf absorber blade is BLADE_LENGTH=60 cm long and translates in z.
+#   The B4C absorber blade is BLADE_LENGTH=60 cm long and translates in z.
 #   At fraction f, the blade occupies z=[z_bot, z_top] = [-30+f*60, +30+f*60].
 #   b4c fills the Hf-slot x/y band for z in [z_bot, z_top] across the
 #   full model height. Water fills the slot below z_bot and above z_top.
@@ -368,14 +368,14 @@ N_CTRL_FUEL_PLATES = 17
 
 def make_control_fuel_element(elem_id, withdrawn_fraction=0.0):
     """
-    Control fuel element with a fixed-length (60 cm) Hf absorber blade that
+    Control fuel element with a fixed-length (60 cm) B4C absorber blade that
     translates in z.
 
     withdrawn_fraction f in [0, 1]:
         f=0 → blade at z=[-30, +30] (all-in, blade fully within active fuel)
         f=1 → blade at z=[+30, +90] (all-out, blade entirely above active fuel)
 
-    The Hf blade always exists; only its z-position changes.
+    The blade always exists; only its z-position changes.
     """
     f = withdrawn_fraction
     z_bot = -HALF_Z + f * ROD_TRAVEL   # blade bottom
@@ -492,8 +492,8 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0):
         region=(+top_guide_bot & -elem_back &
                 +side_inner_left & -side_inner_right & active_z)))
 
-    # ── Fixed-length Hf blade — spans full model height in 3 pieces ─────────
-    # Hf:          [z_bot, z_top]   (blade body)
+    # ── Fixed-length B4C blade — spans full model height in 3 pieces ────────
+    # B4C:         [z_bot, z_top]   (blade body)
     # Water below: [CORE_BOTTOM, z_bot]
     # Water above: [z_top, CORE_TOP]
 
@@ -717,102 +717,163 @@ def make_flux_trap():
 water_cell = openmc.Cell(name='water_fill', fill=water)
 water_univ = openmc.Universe(name='water_universe', cells=[water_cell])
 
-# Graphite reflector universe: bounded axially to match the fuel element pattern.
-# Graphite occupies only the active fuel z-range [-30, +30]; above and below it
-# mirrors the fuel element end-box + water stack so the reflector height matches
-# the core height without contributing graphite outside the active zone.
-graphite_univ = openmc.Universe(
-    name='graphite_universe',
-    cells=[
+# Graphite reflector universe.
+#
+# In-plane: the reflector is NOT a solid block. Each reflector element is an
+# ELEM_X x ELEM_Y (7.6 x 8.0 cm) graphite block centered in its lattice cell,
+# with thin water gaps out to the pitch boundary — the same envelope/pitch
+# construction as the fuel elements, so the gap surfaces COINCIDE with the
+# fuel-lattice cell boundaries (0.05 cm water on each face).
+#
+# Axially: graphite occupies only the active fuel z-range [-30, +30]; above and
+# below, the full pitch footprint mirrors the fuel element end-box + water
+# stack so the reflector height matches the core height without contributing
+# graphite outside the active zone.
+def make_graphite_element():
+    """Graphite reflector element: 7.6 x 8.0 cm block + water gaps to the pitch."""
+    pitch_left  = openmc.XPlane(x0=-PITCH_X / 2.0)
+    pitch_right = openmc.XPlane(x0= PITCH_X / 2.0)
+    pitch_front = openmc.YPlane(y0=-PITCH_Y / 2.0)
+    pitch_back  = openmc.YPlane(y0= PITCH_Y / 2.0)
+
+    blk_left  = openmc.XPlane(x0=-ELEM_X / 2.0)
+    blk_right = openmc.XPlane(x0= ELEM_X / 2.0)
+    blk_front = openmc.YPlane(y0=-ELEM_Y / 2.0)
+    blk_back  = openmc.YPlane(y0= ELEM_Y / 2.0)
+
+    active_z   = +_z_fuel_bot & -_z_fuel_top
+    full_pitch = +pitch_left & -pitch_right & +pitch_front & -pitch_back
+
+    cells = [
         openmc.Cell(
-            name='graphite_active',
+            name='graphite_block',
             fill=graphite,
-            region=+_z_fuel_bot & -_z_fuel_top,              # −30 → +30 cm
+            region=(+blk_left & -blk_right &
+                    +blk_front & -blk_back & active_z),
         ),
+        # Thin inter-element water gaps (active zone only) — identical layout
+        # to the fuel elements' gap cells.
+        openmc.Cell(
+            name='graphite_gap_xleft',
+            fill=water,
+            region=(+pitch_left & -blk_left &
+                    +pitch_front & -pitch_back & active_z),
+        ),
+        openmc.Cell(
+            name='graphite_gap_xright',
+            fill=water,
+            region=(+blk_right & -pitch_right &
+                    +pitch_front & -pitch_back & active_z),
+        ),
+        openmc.Cell(
+            name='graphite_gap_yfront',
+            fill=water,
+            region=(+blk_left & -blk_right &
+                    +pitch_front & -blk_front & active_z),
+        ),
+        openmc.Cell(
+            name='graphite_gap_yback',
+            fill=water,
+            region=(+blk_left & -blk_right &
+                    +blk_back & -pitch_back & active_z),
+        ),
+        # Axial stack above/below the active zone (full pitch footprint)
         openmc.Cell(
             name='graphite_upper_endbox',
             fill=end_box_homog,
-            region=+_z_fuel_top & -_z_endbox_above,           # +30 → +45 cm
+            region=full_pitch & +_z_fuel_top & -_z_endbox_above,   # +30 → +45 cm
         ),
         openmc.Cell(
             name='graphite_upper_water',
             fill=water,
-            region=+_z_endbox_above & -_z_model_top,          # +45 → +95 cm
+            region=full_pitch & +_z_endbox_above & -_z_model_top,  # +45 → +95 cm
         ),
         openmc.Cell(
             name='graphite_lower_endbox',
             fill=end_box_homog,
-            region=+_z_endbox_below & -_z_fuel_bot,           # −45 → −30 cm
+            region=full_pitch & +_z_endbox_below & -_z_fuel_bot,   # −45 → −30 cm
         ),
         openmc.Cell(
             name='graphite_lower_water',
             fill=water,
-            region=+_z_model_bot & -_z_endbox_below,          # −65 → −45 cm
+            region=full_pitch & +_z_model_bot & -_z_endbox_below,  # −65 → −45 cm
         ),
-    ],
-)
+    ]
+    return openmc.Universe(name='graphite_universe', cells=cells)
+
+
+graphite_univ = make_graphite_element()
 
 
 # =============================================================================
 # CORE LATTICE — TECDOC-643 Fig. 2.1 (LEU panel)
 # =============================================================================
 
-std_elems  = [make_standard_fuel_element(i) for i in range(23)]
-ctrl_elems = [make_control_fuel_element(100 + i, withdrawn_fraction=0.0)
-              for i in range(5)]
+def build_core_geometry(withdrawn_fraction=0.0):
+    """Build the full-core openmc.Geometry for a blade WITHDRAWAL fraction f.
 
-W = water_univ
-G = graphite_univ
-S = std_elems
-C = ctrl_elems
-F = make_flux_trap()
+    f = 0.0 → blades fully INSERTED  (absorber spans z=[-30, +30])
+    f = 1.0 → blades fully WITHDRAWN (absorber spans z=[+30, +90])
 
-lattice_universes = [
-    [W, W, W, W, W, W, W, W],
-    [W, G, G, G, G, G, G, W],
-    [W, S[0],  S[1],  C[0],  S[2],  S[3],  S[4],  W],
-    [W, S[5],  S[6],  S[7],  S[8],  C[1],  S[9],  W],
-    [W, S[10], C[2],  S[11], F,     S[12], S[13], W],
-    [W, S[14], S[15], S[16], S[17], C[3],  S[18], W],
-    [W, F,     S[19], C[4],  S[20], S[21], S[22], W],
-    [W, G, G, G, G, G, G, W],
-    [W, W, W, W, W, W, W, W],
-]
+    This is the single construction path used by core.build_model() and all
+    run/ drivers. Vacuum boundaries at the lattice edge and at
+    CORE_BOTTOM=-65 / CORE_TOP=+95 accommodate the full axial stack
+    (water/end-box/fuel/end-box/water) plus blade travel (top +90 at f=1).
+    """
+    std_elems  = [make_standard_fuel_element(i) for i in range(23)]
+    ctrl_elems = [make_control_fuel_element(100 + i,
+                                            withdrawn_fraction=withdrawn_fraction)
+                  for i in range(5)]
 
-core_lattice = openmc.RectLattice(name='core_lattice')
-core_lattice.pitch      = (PITCH_X, PITCH_Y)
-core_lattice.lower_left = (-4 * PITCH_X, -4.5 * PITCH_Y)
-core_lattice.universes  = lattice_universes
+    W = water_univ
+    G = graphite_univ
+    S = std_elems
+    C = ctrl_elems
+    F = make_flux_trap()
+
+    lattice_universes = [
+        [W, W, W, W, W, W, W, W],
+        [W, G, G, G, G, G, G, W],
+        [W, S[0],  S[1],  C[0],  S[2],  S[3],  S[4],  W],
+        [W, S[5],  S[6],  S[7],  S[8],  C[1],  S[9],  W],
+        [W, S[10], C[2],  S[11], F,     S[12], S[13], W],
+        [W, S[14], S[15], S[16], S[17], C[3],  S[18], W],
+        [W, F,     S[19], C[4],  S[20], S[21], S[22], W],
+        [W, G, G, G, G, G, G, W],
+        [W, W, W, W, W, W, W, W],
+    ]
+
+    core_lattice = openmc.RectLattice(name='core_lattice')
+    core_lattice.pitch      = (PITCH_X, PITCH_Y)
+    core_lattice.lower_left = (-4 * PITCH_X, -4.5 * PITCH_Y)
+    core_lattice.universes  = lattice_universes
+    # Guard against edge-case lattice lookups just outside the universe array
+    # (floating-point roundoff at the boundary planes) — fill with bulk water
+    # instead of losing the particle.
+    core_lattice.outer      = water_univ
+
+    core_left   = openmc.XPlane(x0=-4   * PITCH_X, boundary_type='vacuum')
+    core_right  = openmc.XPlane(x0= 4   * PITCH_X, boundary_type='vacuum')
+    core_front  = openmc.YPlane(y0=-4.5 * PITCH_Y, boundary_type='vacuum')
+    core_back   = openmc.YPlane(y0= 4.5 * PITCH_Y, boundary_type='vacuum')
+    core_bottom = openmc.ZPlane(z0=CORE_BOTTOM,     boundary_type='vacuum')
+    core_top    = openmc.ZPlane(z0=CORE_TOP,        boundary_type='vacuum')
+
+    core_region = (
+        +core_left  & -core_right  &
+        +core_front & -core_back   &
+        +core_bottom & -core_top
+    )
+    core_cell = openmc.Cell(name='core_cell', fill=core_lattice,
+                            region=core_region)
+
+    root_universe = openmc.Universe(name='root', cells=[core_cell])
+    return openmc.Geometry(root_universe)
 
 
-# =============================================================================
-# CORE BOUNDING REGION
-# Vacuum boundaries at CORE_BOTTOM=-65 and CORE_TOP=+95 to accommodate
-# the full axial model stack (water/end-box/fuel/end-box/water) plus the
-# control blade travel range (blade top reaches +90 at f=1).
-# =============================================================================
-
-core_left   = openmc.XPlane(x0=-4   * PITCH_X, boundary_type='vacuum')
-core_right  = openmc.XPlane(x0= 4   * PITCH_X, boundary_type='vacuum')
-core_front  = openmc.YPlane(y0=-4.5 * PITCH_Y, boundary_type='vacuum')
-core_back   = openmc.YPlane(y0= 4.5 * PITCH_Y, boundary_type='vacuum')
-core_bottom = openmc.ZPlane(z0=CORE_BOTTOM,     boundary_type='vacuum')
-core_top    = openmc.ZPlane(z0=CORE_TOP,        boundary_type='vacuum')
-
-core_region = (
-    +core_left  & -core_right  &
-    +core_front & -core_back   &
-    +core_bottom & -core_top
-)
-core_cell = openmc.Cell(name='core_cell', fill=core_lattice, region=core_region)
-
-
-# =============================================================================
-# ROOT UNIVERSE AND GEOMETRY EXPORT
-# =============================================================================
-
-root_universe = openmc.Universe(name='root', cells=[core_cell])
-geometry      = openmc.Geometry(root_universe)
+# Module-level default geometry (blades fully inserted) — kept for direct
+# `python geometry.py` debug use; drivers should call build_core_geometry().
+geometry = build_core_geometry(withdrawn_fraction=0.0)
 
 
 if __name__ == '__main__':
