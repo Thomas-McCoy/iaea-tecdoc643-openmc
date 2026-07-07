@@ -41,7 +41,8 @@ from geometry import (
     CORE_BOTTOM, CORE_TOP,
     ENDBOX_ABOVE_TOP, ENDBOX_BELOW_BOT,
     FT_HOLE_RADIUS,
-    ELEM_Y, ACTIVE_STACK_X, ABSORBER_GAP, ABSORBER_THICK,
+    ELEM_Y, ACTIVE_STACK_X, ABSORBER_THICK,
+    CTRL_OUTER_OFFSET, CTRL_AL_PLATE_THICK, CTRL_BLADE_WATER,
     water_univ, graphite_univ, make_flux_trap,
     make_standard_fuel_element, make_control_fuel_element,
 )
@@ -131,9 +132,11 @@ FT2_Y = -2.0 * PITCH_Y    # ≈ -16.2 cm
 # Control element C2 — lattice universes[4][2], centre (x, y)
 C2_X = -1.5 * PITCH_X     # ≈ -11.55 cm
 C2_Y =  0.0               # cm  (row 4 centre)
-# XZ through the blade: slice at the bottom Hf-slot y (relative to the element
-# centre) so the B4C absorber band is captured in the constant-y plane.
-C2_BLADE_Y = C2_Y + (-ELEM_Y / 2.0 + ABSORBER_GAP + ABSORBER_THICK / 2.0)  # ≈ -3.45
+# XZ through the blade: slice at the bottom B4C-slot y (relative to the
+# element centre) so the absorber band is captured in the constant-y plane.
+# Wall -> fuel: offset water | outer guide | blade water | [B4C slot, here].
+C2_BLADE_Y = C2_Y + (-ELEM_Y / 2.0 + CTRL_OUTER_OFFSET + CTRL_AL_PLATE_THICK
+                     + CTRL_BLADE_WATER + ABSORBER_THICK / 2.0)  # ≈ -3.5003
 
 # Blade z-extent at f = 0 (fully inserted)
 BLADE_Z_BOT = -HALF_Z                 # -30 cm
