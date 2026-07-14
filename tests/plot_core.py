@@ -47,14 +47,14 @@ from geometry import (
     make_standard_fuel_element, make_control_fuel_element,
 )
 from materials import (
-    fuel, clad, water, water_flux_trap, b4c, graphite, aluminum, end_box_homog,
+    fuel, clad, water, water_core, b4c, graphite, aluminum, end_box_homog,
 )
 
 # =============================================================================
 # Rebuild geometry with control blades FULLY INSERTED (f = 0.0)
 # =============================================================================
 
-def build_geometry(f=0.0):
+def build_geometry(f=1.0):
     """Fresh OpenMC geometry for blade withdrawn_fraction f (mirrors run scripts)."""
     std_elems  = [make_standard_fuel_element(i) for i in range(23)]
     ctrl_elems = [make_control_fuel_element(100 + i, withdrawn_fraction=f)
@@ -101,8 +101,8 @@ geometry = build_geometry(f=0.0)   # blades fully in
 COLORS = {
     fuel:            (210,  55,  55),   # red          — U₃Si₂-Al fuel meat
     clad:            (200, 200, 200),   # light gray   — Al cladding
-    water:           ( 85, 175, 235),   # sky blue     — bulk water 294 K
-    water_flux_trap: ( 11,  34, 117),   # deep navy    — flux trap water 316.8 K
+    water:           ( 85, 175, 235),   # sky blue     — outer pool water 294 K
+    water_core:      ( 11,  34, 117),   # deep navy    — core coolant water 316.8 K
     graphite:        ( 65,  65,  65),   # dark gray    — graphite reflector
     aluminum:        (165, 165, 200),   # silver-blue  — structural Al
     b4c:             ( 25, 120,  55),   # dark green   — B₄C absorber blade
