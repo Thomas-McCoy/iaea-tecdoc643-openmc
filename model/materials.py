@@ -19,7 +19,7 @@ import openmc
 # Natural-carbon (C0, ZAID 6000) vs. explicit C12/C13 isotopic split — the
 # deck specifies natural carbon for both B4C and graphite, matching b4c's
 # C0 choice below.
-USE_NATURAL_CARBON = True
+USE_NATURAL_CARBON = False
 
 # =============================================================================
 # FUEL MATERIAL
