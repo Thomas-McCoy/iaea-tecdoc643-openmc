@@ -109,7 +109,9 @@ b4c = openmc.Material(name='B4C control absorber')
 b4c.temperature = 294.0
 b4c.add_nuclide('B10', 1.914973e-02)
 b4c.add_nuclide('B11', 7.010412e-02)
-b4c.add_nuclide('C0',  2.005592e-02)
+b4c.add_nuclide('C12', 2.005592e-02 * 0.9893)
+b4c.add_nuclide('C13', 2.005592e-02 * 0.0107)
+# b4c.add_nuclide('C0',  2.005592e-02)
 b4c.set_density('sum')
 
 # b4c.add_nuclide('C12', 2.005592e-02 * 0.9893)
