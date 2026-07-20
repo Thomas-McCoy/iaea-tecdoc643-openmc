@@ -92,7 +92,7 @@ def build_geometry(f=1.0):
     return openmc.Geometry(openmc.Universe(cells=[core_cell]))
 
 
-geometry = build_geometry(f=0.0)   # blades fully in
+geometry = build_geometry(f=0.5)   # blades fully in
 
 # =============================================================================
 # Colour map
