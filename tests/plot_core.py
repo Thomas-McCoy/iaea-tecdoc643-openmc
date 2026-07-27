@@ -58,7 +58,7 @@ sys.path.insert(0, os.path.join(REPO_ROOT, 'model'))
 
 import openmc
 from geometry import (
-    PITCH_X, PITCH_Y, HALF_Z, BLADE_LENGTH,
+    PITCH_X, PITCH_Y, HALF_Z, BLADE_LENGTH, ROD_TRAVEL,
     CORE_BOTTOM, CORE_TOP,
     ENDBOX_ABOVE_TOP, ENDBOX_BELOW_BOT,
     FT_HOLE_RADIUS,
@@ -160,9 +160,16 @@ C2_Y =  0.0               # cm  (row 4 centre)
 C2_BLADE_Y = C2_Y + (-ELEM_Y / 2.0 + CTRL_OUTER_OFFSET + CTRL_AL_PLATE_THICK
                      + CTRL_BLADE_WATER + ABSORBER_THICK / 2.0)  # ≈ -3.5003
 
-# Blade z-extent at f = 0 (fully inserted)
-BLADE_Z_BOT = -HALF_Z                 # -30 cm
-BLADE_Z_TOP = -HALF_Z + BLADE_LENGTH  # +30 cm
+# Blade withdrawal fraction for the standard figure. f = 0 is fully INSERTED,
+# which is the position this figure exists to show.
+DEFAULT_PLOT_F = 0.0
+
+# Blade z-extent, DERIVED from DEFAULT_PLOT_F using the same formula the
+# geometry itself uses. Previously hardcoded to the f = 0 values while
+# build_geometry() was called with f = 0.5, so the annotation silently stopped
+# matching the geometry it annotates. Deriving it makes that drift impossible.
+BLADE_Z_BOT = -HALF_Z + DEFAULT_PLOT_F * ROD_TRAVEL
+BLADE_Z_TOP = BLADE_Z_BOT + BLADE_LENGTH
 
 # Full-core view extents
 _PAD  = 3.0
@@ -218,7 +225,7 @@ OUT_DIR = os.path.join(REPO_ROOT, 'plots')
 
 def build_default_figure():
     """The standard geometry figure — unchanged behaviour, unchanged filename."""
-    geometry = build_geometry(f=0.5)   # blades fully in
+    geometry = build_geometry(f=DEFAULT_PLOT_F)   # blades fully in
 
     fig = plt.figure(figsize=(20, 17))
     gs  = gridspec.GridSpec(
@@ -235,7 +242,7 @@ def build_default_figure():
 
     fig.suptitle(
         'IAEA TECDOC-643  Generic 10 MW LEU Research Reactor — Geometry  '
-        '(control blades fully inserted, f = 0)\n'
+        f'(control blades fully inserted, f = {DEFAULT_PLOT_F:.0f})\n'
         f'Flux trap: ZCylinder r = {FT_HOLE_RADIUS:.4f} cm, hot water 316.8 K inside   |   '
         f'B4C blade z = [{BLADE_Z_BOT:.0f}, {BLADE_Z_TOP:.0f}] cm ({BLADE_LENGTH:.0f} cm)',
         fontsize=10, y=0.996,
