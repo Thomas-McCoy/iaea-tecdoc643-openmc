@@ -687,12 +687,11 @@ CTRL_FEEDER_CHANNEL = WATER_CHAN_THICK   # 0.219 cm [DERIVED — standard channe
 # stack) and the control element's outer offset are physically different
 # things and should never have shared a constant, regardless of value.
 #
-# [MCNP-PROVISIONAL] 0.1305: Kyle approved 0.1305 (outer offset) / 0.1275
-# (derived blade water) but sourced them as "the same one as that figure in
-# the report" — the PRO-X figure, which is not a governing source per project
-# rules. Pending confirmation that the reference MCNP model's surface cards
-# give 0.1305 directly. Upgrade to [MCNP] when confirmed.
-CTRL_OUTER_OFFSET = 0.1305   # cm [MCNP-PROVISIONAL]
+# [MCNP] 0.1305: supplied directly by Kyle as the end water channel value
+# (2026-07-31), who stated the reference MCNP model either already carries it
+# or will be updated to it. The value may therefore POSTDATE the current state
+# of the reference model.
+CTRL_OUTER_OFFSET = 0.1305   # cm [MCNP]
 
 # End-block budget: everything between the fuel stack edge and the wall.
 CTRL_END_BLOCK = ELEM_Y / 2.0 - CTRL_FUEL_STACK_HALF   # 1.1685 cm
