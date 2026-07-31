@@ -138,17 +138,26 @@ b4c.set_density('sum')
 # REFLECTOR MATERIAL
 # Graphite reflector blocks surrounding the core.
 #
-# Density: 2.26 g/cm3, natural (single-crystal) graphite. [MCNP] — team
-# decision recorded by Kyle, 2026-07-31. TECDOC-643 specifies NO graphite
-# density at all; the 1.7400 previously here was typical nuclear-grade
-# (porous) graphite and was an unsupported insertion, sourced from neither
-# TECDOC-643 nor the reference MCNP model.
+# Density: 8.724000E-02 atoms/b-cm total carbon, taken DIRECTLY from the
+# reference MCNP model card m00005 [MCNP]:
 #
-# Isotopics are derived by OpenMC from natural abundance (add_element), not
-# hand-entered. For the cross-validation spreadsheet, 2.26 g/cm3 resolves to:
-#   C total  1.13313E-01 atoms/b-cm
-#   C-12     1.12101E-01  (98.93 at%)
-#   C-13     1.21245E-03  ( 1.07 at%)
+#   m00005     $     294.0    Graphite reflector
+#          6000    8.724000E-02
+#
+# TECDOC-643 specifies no graphite density; neither model assigns a mass
+# density to this material — the atom density above is the specification on
+# both sides. The 1.7400 g/cm3 previously here was this same atom density
+# back-converted and rounded (8.724000E-02 -> 1.74000 g/cm3 using OpenMC's
+# isotopic masses, M_eff = 12.01112 from 0.988922 x 12.000000 +
+# 0.011078 x 13.00335484); it reproduced the atom density to 0.0003%, inside
+# the 0.010% tolerance. Specifying in atom/b-cm removes even that round-off.
+#
+# Card 6000 is natural carbon, unsplit. OpenMC's add_element('C') expands to
+# C-12/C-13 (no natural-carbon evaluation exists in ENDF/B-VIII.0), so the
+# C-12/C-13 split below is an OpenMC-side method artifact with no MCNP
+# counterpart — the spreadsheet carries those rows as N/A on the MCNP side.
+# For a VII.0 matched-library run the exact counterpart is the C0 nuclide
+# (USE_NATURAL_CARBON branch below).
 # =============================================================================
 
 graphite = openmc.Material(name='graphite_reflector')
@@ -157,7 +166,7 @@ if USE_NATURAL_CARBON:
     graphite.add_nuclide('C0', 1.0)
 else:
     graphite.add_element('C', 1.0)
-graphite.set_density('g/cm3', 2.26)
+graphite.set_density('atom/b-cm', 8.724000E-02)
 graphite.add_s_alpha_beta('c_Graphite')
 
 # =============================================================================
