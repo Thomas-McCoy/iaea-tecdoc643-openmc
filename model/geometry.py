@@ -110,6 +110,26 @@ GAP_Y = (PITCH_Y - ELEM_Y) / 2.0   # cm
 assert GAP_X > 0, "PITCH_X must exceed ELEM_X (zero/negative gap)"
 assert GAP_Y > 0, "PITCH_Y must exceed ELEM_Y (zero/negative gap)"
 
+# Solid (non-plate) block dimensions — flux trap and graphite reflector.
+# These blocks sit inside the lattice pitch with the SAME 1 mm water gap as the
+# fuel elements: 7.6 x 8.0 inside the 7.7 x 8.1 pitch. This is what resolves the
+# old "graphite inter-block water channel" question — the channel IS the pitch
+# gap (GAP_X in x, GAP_Y in y). There is no separate channel dimension to find.
+# The homogenized end-box above and below these blocks stays FULL PITCH.
+FT_BLOCK_X   = ELEM_X   # 7.600 cm                                    [MCNP]
+FT_BLOCK_Y   = ELEM_Y   # 8.000 cm                                    [MCNP]
+REFL_BLOCK_X = ELEM_X   # 7.600 cm                                    [MCNP]
+REFL_BLOCK_Y = ELEM_Y   # 8.000 cm                                    [MCNP]
+
+assert abs((PITCH_X - FT_BLOCK_X) / 2.0 - GAP_X) < 1e-12, \
+    "flux-trap block does not leave the standard inter-element gap in x"
+assert abs((PITCH_Y - FT_BLOCK_Y) / 2.0 - GAP_Y) < 1e-12, \
+    "flux-trap block does not leave the standard inter-element gap in y"
+assert abs((PITCH_X - REFL_BLOCK_X) / 2.0 - GAP_X) < 1e-12, \
+    "reflector block does not leave the standard inter-element gap in x"
+assert abs((PITCH_Y - REFL_BLOCK_Y) / 2.0 - GAP_Y) < 1e-12, \
+    "reflector block does not leave the standard inter-element gap in y"
+
 SIDE_PLATE_THICK = 0.48   # cm  (4.8 mm)
 ACTIVE_STACK_X   = ELEM_X - 2 * SIDE_PLATE_THICK   # 6.64 cm
 
@@ -1006,10 +1026,10 @@ def make_flux_trap():
     the MCNP deck which models the hole as a ZCylinder rather than the
     originally-commented square.
 
-    The aluminum block itself fills the FULL lattice pitch (PITCH_X x
-    PITCH_Y = 7.7 x 8.1 cm) — there is no inter-element water gap around the
-    active-zone block. The axial end-box (homogenized water/Al) region above
-    and below is likewise one solid full-pitch block — no gap subdivision.
+    The aluminum block is FT_BLOCK_X x FT_BLOCK_Y = 7.6 x 8.0 cm inside the
+    7.7 x 8.1 cm pitch, leaving the same 1 mm water gap as the fuel elements.
+    The axial end-box (homogenized water/Al) region above and below stays one
+    solid FULL-PITCH block — no gap subdivision there.
 
     Cylinder: radius FT_HOLE_RADIUS = 2.5 cm, centered at element origin (x=0, y=0).
     The cylinder is axially unbounded within the plate height (plate_z clips it).
@@ -1020,10 +1040,10 @@ def make_flux_trap():
     pitch_front = openmc.YPlane(y0=-PITCH_Y / 2.0)
     pitch_back  = openmc.YPlane(y0= PITCH_Y / 2.0)
 
-    elem_left  = openmc.XPlane(x0=-ELEM_X / 2.0)
-    elem_right = openmc.XPlane(x0= ELEM_X / 2.0)
-    elem_front = openmc.YPlane(y0=-ELEM_Y / 2.0)
-    elem_back  = openmc.YPlane(y0= ELEM_Y / 2.0)
+    block_left  = openmc.XPlane(x0=-FT_BLOCK_X / 2.0)
+    block_right = openmc.XPlane(x0= FT_BLOCK_X / 2.0)
+    block_front = openmc.YPlane(y0=-FT_BLOCK_Y / 2.0)
+    block_back  = openmc.YPlane(y0= FT_BLOCK_Y / 2.0)
 
     hole_cyl = openmc.ZCylinder(x0=0.0, y0=0.0, r=FT_HOLE_RADIUS)
 
@@ -1037,12 +1057,33 @@ def make_flux_trap():
         fill=water_core,
         region=-hole_cyl & plate_z
     ))
-    # Aluminum block: full pitch envelope minus the cylinder, active zone only
+    # Aluminum block: 7.6 x 8.0 block envelope minus the cylinder, plate height
     cells.append(openmc.Cell(
         name='flux_trap_aluminum_block',
         fill=aluminum,
-        region=(+pitch_left & -pitch_right & +pitch_front & -pitch_back & +hole_cyl & plate_z)
+        region=(+block_left & -block_right & +block_front & -block_back
+                & +hole_cyl & plate_z)
     ))
+
+    # Inter-element water gaps around the block — the 1 mm pitch gap, same as
+    # the fuel elements. Core coolant (316.8 K), matching both the flux-trap
+    # hole and the neighbouring fuel-element gaps.
+    cells.append(openmc.Cell(
+        name='flux_trap_gap_xleft', fill=water_core,
+        region=(+pitch_left & -block_left &
+                +pitch_front & -pitch_back & plate_z)))
+    cells.append(openmc.Cell(
+        name='flux_trap_gap_xright', fill=water_core,
+        region=(+block_right & -pitch_right &
+                +pitch_front & -pitch_back & plate_z)))
+    cells.append(openmc.Cell(
+        name='flux_trap_gap_yfront', fill=water_core,
+        region=(+block_left & -block_right &
+                +pitch_front & -block_front & plate_z)))
+    cells.append(openmc.Cell(
+        name='flux_trap_gap_yback', fill=water_core,
+        region=(+block_left & -block_right &
+                +block_back & -pitch_back & plate_z)))
 
     # Axial regions above/below active fuel. End-box is one solid full-pitch
     # homogenized block — no inter-element water gap subdivision (the
@@ -1086,10 +1127,11 @@ water_univ = openmc.Universe(name='water_universe', cells=[water_cell])
 
 # Graphite reflector universe.
 #
-# In-plane: the graphite block itself IS a solid block — each reflector
-# element fills its full lattice pitch cell in the active-graphite z-range
-# (no inter-element water gaps), so adjacent reflector positions form one
-# continuous graphite wall.
+# In-plane: each reflector position holds a discrete REFL_BLOCK_X x REFL_BLOCK_Y
+# = 7.6 x 8.0 cm graphite block inside the 7.7 x 8.1 cm pitch, leaving the same
+# 1 mm water gap as the fuel elements. Adjacent reflector positions therefore
+# form a row of separate blocks with a water channel between them, NOT the
+# continuous graphite wall this used to build.
 #
 # Axially: graphite occupies the full block z-range [-31, +31]. Above
 # and below, the end-box (homogenized water/Al) region is one solid
@@ -1097,18 +1139,27 @@ water_univ = openmc.Universe(name='water_universe', cells=[water_cell])
 # Water-beyond stays full pitch, mirroring the fuel element end-box + water
 # stack so the reflector height matches the core height.
 def make_graphite_element():
-    """Graphite reflector element: continuous wall in-plane, solid end-box axially."""
-    # TODO (2026-07-20 meeting): add small water channels BETWEEN graphite
-    # blocks. Dimension is pending — it must come FROM THE MCNP MODEL; do not
-    # invent a channel width. Until then the reflector remains a continuous
-    # in-plane wall (no inter-block gap).
+    """Graphite reflector element: discrete block + water gaps, solid end-box axially."""
     pitch_left  = openmc.XPlane(x0=-PITCH_X / 2.0)
     pitch_right = openmc.XPlane(x0= PITCH_X / 2.0)
     pitch_front = openmc.YPlane(y0=-PITCH_Y / 2.0)
     pitch_back  = openmc.YPlane(y0= PITCH_Y / 2.0)
 
+    block_left  = openmc.XPlane(x0=-REFL_BLOCK_X / 2.0)
+    block_right = openmc.XPlane(x0= REFL_BLOCK_X / 2.0)
+    block_front = openmc.YPlane(y0=-REFL_BLOCK_Y / 2.0)
+    block_back  = openmc.YPlane(y0= REFL_BLOCK_Y / 2.0)
+
     plate_z    = +_z_plate_bot & -_z_plate_top   # [−31, +31]
     full_pitch = +pitch_left & -pitch_right & +pitch_front & -pitch_back
+
+    # Inter-block gap water: water_core (316.8 K), NOT the 294 K bulk pool
+    # water. MODELING CHOICE, not a measured condition — graphite generates no
+    # heat, so coolant in these channels would in reality sit nearer the inlet
+    # temperature than the 316.8 K core-average value. water_core is chosen for
+    # consistency with the adjacent fuel-element gaps, which these channels are
+    # hydraulically continuous with.
+    gap_water = water_core
 
     # End-box is one solid full-pitch homogenized block — no inter-element
     # water gap subdivision (the end-box material is already a homogenized
@@ -1117,7 +1168,28 @@ def make_graphite_element():
         openmc.Cell(
             name='graphite_block',
             fill=graphite,
-            region=plate_z,
+            region=(+block_left & -block_right &
+                    +block_front & -block_back & plate_z),
+        ),
+        openmc.Cell(
+            name='graphite_gap_xleft', fill=gap_water,
+            region=(+pitch_left & -block_left &
+                    +pitch_front & -pitch_back & plate_z),
+        ),
+        openmc.Cell(
+            name='graphite_gap_xright', fill=gap_water,
+            region=(+block_right & -pitch_right &
+                    +pitch_front & -pitch_back & plate_z),
+        ),
+        openmc.Cell(
+            name='graphite_gap_yfront', fill=gap_water,
+            region=(+block_left & -block_right &
+                    +pitch_front & -block_front & plate_z),
+        ),
+        openmc.Cell(
+            name='graphite_gap_yback', fill=gap_water,
+            region=(+block_left & -block_right &
+                    +block_back & -pitch_back & plate_z),
         ),
         openmc.Cell(
             name='graphite_upper_endbox',
@@ -1379,8 +1451,30 @@ def _run_point_checks(geom, f):
         assert got == want.name, \
             f"f={f}: {label} at {point} is '{got}', expected '{want.name}'"
 
+    # B2 — the flux-trap and graphite blocks are 7.6 x 8.0 inside the pitch, so
+    # a probe just inside the block edge must be solid and a probe in the pitch
+    # gap must be water. Sampling at z=0 and at the top of the clad band.
+    for row_b, col_b, tok, solid in ((4, 4, 'F', aluminum), (1, 1, 'G', graphite)):
+        assert CORE_MAP[row_b][col_b] == tok, \
+            f"B2 point-check anchor ({row_b},{col_b}) is not '{tok}'"
+        bx, by = _lattice_center(row_b, col_b)
+        blk_x = FT_BLOCK_X if tok == 'F' else REFL_BLOCK_X
+        # Just inside the block edge in x (clear of the flux-trap hole).
+        inside = _material_at(geom, bx + blk_x / 2.0 - 0.02, by, 0.0)
+        assert inside == solid.name, \
+            f"f={f}: '{tok}' block interior is '{inside}', expected '{solid.name}'"
+        # Middle of the pitch gap in x.
+        gap = _material_at(geom, bx + PITCH_X / 2.0 - GAP_X / 2.0, by, 0.0)
+        assert gap == water_core.name, \
+            f"f={f}: '{tok}' inter-block gap is '{gap}', expected '{water_core.name}'"
+        # Same block, up in the clad-extension band — blocks run to +/-31 too.
+        top = _material_at(geom, bx + blk_x / 2.0 - 0.02, by, z_mid_clad_ext)
+        assert top == solid.name, \
+            f"f={f}: '{tok}' block at z={z_mid_clad_ext} is '{top}', " \
+            f"expected '{solid.name}'"
+
     print(f"  point checks (f={f}): axial stack "
-          f"meat/clad-ext/end-box/water all resolve correctly")
+          f"meat/clad-ext/end-box/water and 7.6x8.0 blocks + gaps all resolve")
 
 
 def _run_blade_slot_checks(geom, f):
