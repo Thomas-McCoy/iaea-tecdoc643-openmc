@@ -44,15 +44,17 @@ Control blade model — fixed-length sliding absorber:
     withdrawn_fraction f in [0, 1]:
         z_bot = -30 + f * 60   → f=0: -30,  f=1: +30
         z_top = z_bot + 60     → f=0: +30,  f=1: +90 (= CORE_TOP at f=1)
-    b4c fills the absorber-slot x/y band for z in [z_bot, z_top]. An ENDBOX_HEIGHT
-    (14 cm) homogenized (end_box_homog) end-box cap rides above the blade in
-    the blade's own slot footprint, with its bottom at
-    max(z_top, HALF_PLATE_Z) — see the A4 note in the control-element section.
-    At f=0 the cap sits at [+31,+45], COPLANAR with the surrounding end-boxes
-    (2026-07-20 decision), and the 1 cm slot band [+30,+31] between the blade
-    top and the cap is core coolant water. At f=1 the blade top coincides with
-    CORE_TOP (z_top == +90), so the cap is pushed entirely out of the model and
-    is NOT created — the blade itself fills the slot to the top.
+    b4c fills the absorber-slot x/y band for z in [z_bot, z_top]. A
+    BLADE_TOP_CLAD (1 cm) aluminum clad rides directly on the B4C (top end
+    only — side and bottom clad are absent by confirmation), and an
+    ENDBOX_HEIGHT (14 cm) homogenized (end_box_homog) end-box cap rides on
+    the CLAD. Both fill the slot footprint and clip at CORE_TOP. At f=0 the
+    stack is B4C [-30,+30], clad [+30,+31], cap [+31,+45] — the cap COPLANAR
+    with the surrounding end-boxes falls out of BLADE_TOP_CLAD == CLAD_EXT
+    (2026-07-31; supersedes the A4 Option B water band, which the clad now
+    fills). At f=1 the B4C top coincides with CORE_TOP (z_top == +90) — it is
+    the B4C, not the aluminum, that touches the boundary — and clad and cap
+    are clipped entirely out of the model.
     Plate/clad, structural and channel cells run the full plate height
     z=[-31, +31]; only the fuel meat is restricted to z=[-30, +30].
     End-box/water cells cover z outside [-31, +31].
@@ -202,6 +204,16 @@ assert abs(HALF_PLATE_Z - (HALF_Z + CLAD_EXT)) < 1e-12, \
 
 BLADE_LENGTH     = 60.0    # cm — rigid absorber blade (fixed length, translates in z)
 ROD_TRAVEL       = 60.0    # cm — full stroke
+
+# Blade TOP cladding — aluminum riding on the B4C, part of the blade assembly.
+# [MCNP] Kyle confirmed 2026-07-31: 1.0 cm, TOP END ONLY (side and bottom clad
+# are absent by confirmation, not omission). Derived from CLAD_EXT because it
+# is the same physical 1 cm as the fuel plates' unfueled extension — if Kyle
+# later decouples them, this is a one-line change. Never written as 1.0.
+# The B4C itself stays BLADE_LENGTH = 60 and ROD_TRAVEL stays 60: it is the
+# B4C that touches CORE_TOP at f=1, and the clad above it clips away at the
+# model boundary exactly as the cap does.
+BLADE_TOP_CLAD   = CLAD_EXT   # 1.0 cm [MCNP]
 CORE_TOP         = +90.0   # cm — vacuum boundary; COINCIDES with the fully-withdrawn
                             # (f=1) blade top (z_top = -30 + 60 + 60 = +90). No cap above.
 CORE_BOTTOM      = -90.0   # cm — vacuum boundary; symmetric with CORE_TOP
@@ -608,10 +620,10 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
 #   b4c fills the absorber-slot x/y band for z in [z_bot, z_top] across the full
 #   model height. Below z_bot, water fills the slot down to the plate bottom
 #   (-31) — the blade never dips below z=-30, so the lower end-box/water are
-#   uniform material with no reserved slot at all. Above z_top, the slot's own
-#   material is region-appropriate (coolant up to +31 if the blade is below
-#   it, then the 14 cm cap, then water to CORE_TOP); at f=1, z_top == CORE_TOP
-#   so that complement is zero-measure (no cap).
+#   uniform material with no reserved slot at all. Above z_top the assembly
+#   stack rides with the blade: BLADE_TOP_CLAD (1 cm) aluminum clad, then the
+#   14 cm cap riding on the clad, then water to CORE_TOP — each clipped at
+#   CORE_TOP; at f=1, z_top == CORE_TOP so clad and cap are both clipped away.
 #   All guide/slider/fuel/channel cells are bounded to the PLATE height
 #   z=[-31, +31]; only the fuel meat stops at z=[-30, +30]; end-box/water cells
 #   fill z outside [-31, +31].
@@ -954,40 +966,63 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     #
     # No lower-side counterpart is needed: blade_z_bot is always >= -HALF_Z
     # (asserted above), so the blade never reaches the lower end-box/water.
+    #
+    # ── Blade top clad + moving cap (commit 17, 2026-07-31) ────────────────
+    # A BLADE_TOP_CLAD (1 cm) aluminum clad rides directly on the B4C, and the
+    # ENDBOX_HEIGHT (14 cm) end_box_homog cap rides on the CLAD, not the B4C.
+    # Both fill the full slot footprint and both clip at CORE_TOP:
+    #   f = 0.0   B4C [-30,+30]  clad [+30,+31]  cap [+31,+45]
+    #   f = 0.5   B4C [  0,+60]  clad [+60,+61]  cap [+61,+75]
+    #   f = 1.0   B4C [+30,+90]  clad clipped    cap clipped
+    # Clad is partially clipped for f > 59/60, gone at f = 1.0; the cap is
+    # fully gone for f >= 59/60 (cap bottom z_top + 1 reaches CORE_TOP).
+    #
+    # The Option B max(z_top, HALF_PLATE_Z) cap-floor guard (A4) is DROPPED,
+    # not kept as a dead branch: the cap bottom is now z_top + BLADE_TOP_CLAD
+    # = HALF_Z + f*ROD_TRAVEL + CLAD_EXT = 31 + 60f >= 31 for all f >= 0, with
+    # equality at f = 0 — the coplanarity the guard protected now falls out of
+    # the arithmetic (BLADE_TOP_CLAD == CLAD_EXT is exactly the 1 cm the A4
+    # water band used to fill). The assert below keeps the invariant loud if
+    # BLADE_TOP_CLAD is ever decoupled from CLAD_EXT and shrunk.
     if z_top < CORE_TOP:
-        cap_bot_z = max(z_top, HALF_PLATE_Z)
-        # Cap top is always >= ENDBOX_ABOVE_TOP, so the water above the cap
-        # never encroaches on the end-box band [+31,+45].
-        assert cap_bot_z + ENDBOX_HEIGHT >= ENDBOX_ABOVE_TOP, (
-            f"ctrl{elem_id}: cap top {cap_bot_z + ENDBOX_HEIGHT:.2f} < "
-            f"ENDBOX_ABOVE_TOP {ENDBOX_ABOVE_TOP} — cap would not clear the "
-            f"end-box band")
-        blade_cap_bot = openmc.ZPlane(z0=cap_bot_z)
-        blade_cap_top = openmc.ZPlane(z0=min(cap_bot_z + ENDBOX_HEIGHT, CORE_TOP))
-
-        # Coolant in the slot between the blade top and the cap floor. Empty
-        # (zero-measure) whenever the blade has been withdrawn past +31.
-        if cap_bot_z > z_top:
-            cells.append(openmc.Cell(
-                name=f'ctrl{elem_id}_slot_b_water_under_cap', fill=water_core,
-                region=slot_b & +blade_z_top & -blade_cap_bot))
-            cells.append(openmc.Cell(
-                name=f'ctrl{elem_id}_slot_t_water_under_cap', fill=water_core,
-                region=slot_t & +blade_z_top & -blade_cap_bot))
-
+        blade_clad_top = openmc.ZPlane(
+            z0=min(z_top + BLADE_TOP_CLAD, CORE_TOP))
         cells.append(openmc.Cell(
-            name=f'ctrl{elem_id}_blade_cap_slot_b', fill=end_box_homog,
-            region=slot_b & +blade_cap_bot & -blade_cap_top))
+            name=f'ctrl{elem_id}_blade_clad_slot_b', fill=aluminum,
+            region=slot_b & +blade_z_top & -blade_clad_top))
         cells.append(openmc.Cell(
-            name=f'ctrl{elem_id}_blade_cap_slot_t', fill=end_box_homog,
-            region=slot_t & +blade_cap_bot & -blade_cap_top))
-        if blade_cap_top.z0 < CORE_TOP:
+            name=f'ctrl{elem_id}_blade_clad_slot_t', fill=aluminum,
+            region=slot_t & +blade_z_top & -blade_clad_top))
+
+        if blade_clad_top.z0 < CORE_TOP:
+            cap_bot_z = blade_clad_top.z0   # cap rides on the clad
+            assert cap_bot_z >= HALF_PLATE_Z, (
+                f"ctrl{elem_id}: cap bottom {cap_bot_z:.2f} < HALF_PLATE_Z "
+                f"{HALF_PLATE_Z} — BLADE_TOP_CLAD no longer reaches the "
+                f"end-box floor at full insertion (decoupled from CLAD_EXT?)")
+            # Cap top is always >= ENDBOX_ABOVE_TOP, so the water above the
+            # cap never encroaches on the end-box band [+31,+45].
+            assert cap_bot_z + ENDBOX_HEIGHT >= ENDBOX_ABOVE_TOP, (
+                f"ctrl{elem_id}: cap top {cap_bot_z + ENDBOX_HEIGHT:.2f} < "
+                f"ENDBOX_ABOVE_TOP {ENDBOX_ABOVE_TOP} — cap would not clear "
+                f"the end-box band")
+            # Reuse blade_clad_top as the cap floor — one plane, no coincident
+            # duplicate surface.
+            blade_cap_top = openmc.ZPlane(
+                z0=min(cap_bot_z + ENDBOX_HEIGHT, CORE_TOP))
             cells.append(openmc.Cell(
-                name=f'ctrl{elem_id}_water_above_cap_slot_b', fill=water,
-                region=slot_b & +blade_cap_top & -_z_model_top))
+                name=f'ctrl{elem_id}_blade_cap_slot_b', fill=end_box_homog,
+                region=slot_b & +blade_clad_top & -blade_cap_top))
             cells.append(openmc.Cell(
-                name=f'ctrl{elem_id}_water_above_cap_slot_t', fill=water,
-                region=slot_t & +blade_cap_top & -_z_model_top))
+                name=f'ctrl{elem_id}_blade_cap_slot_t', fill=end_box_homog,
+                region=slot_t & +blade_clad_top & -blade_cap_top))
+            if blade_cap_top.z0 < CORE_TOP:
+                cells.append(openmc.Cell(
+                    name=f'ctrl{elem_id}_water_above_cap_slot_b', fill=water,
+                    region=slot_b & +blade_cap_top & -_z_model_top))
+                cells.append(openmc.Cell(
+                    name=f'ctrl{elem_id}_water_above_cap_slot_t', fill=water,
+                    region=slot_t & +blade_cap_top & -_z_model_top))
 
     # ── 17-plate fuel follower (active zone only) ───────────────────────────
 
@@ -1721,11 +1756,13 @@ def _run_point_checks(geom, f):
 def _run_blade_slot_checks(geom, f):
     """Point-containment assertions down a control element's absorber slot.
 
-    This is the A4 (Option B) check. At full insertion the blade top is at +30
-    but the end-box floor is at +31, so the slot must read:
-        blade -> 1 cm coolant -> 14 cm cap (coplanar at [+31,+45]) -> water.
-    Once the blade is withdrawn past +31 the coolant band closes up and the cap
-    sits directly on the blade top again.
+    Blade assembly stack (commit 17): B4C, then BLADE_TOP_CLAD (1 cm) aluminum
+    riding on it, then the 14 cm cap riding on the clad, then water — clad and
+    cap clipped at CORE_TOP. At full insertion the slot must read:
+        blade -> 1 cm aluminum clad [+30,+31] -> 14 cm cap (coplanar at
+        [+31,+45]) -> water.
+    The clad band is the old A4 Option B water band — the fig3 defect — and
+    must now return aluminum, not water.
     """
     row, col = _first_position('C')          # first control element (C2)
     ex, ey = _lattice_center(row, col)
@@ -1740,18 +1777,18 @@ def _run_blade_slot_checks(geom, f):
     z_top = z_bot + BLADE_LENGTH
 
     def want_at(z):
-        """Material the slot should carry at height z, per the A4 resolution."""
+        """Material the slot should carry at height z (mirrors the builder)."""
         if z < z_bot:
             return water_core          # slot below the blade, down to −31
         if z < z_top:
             return b4c                 # the blade itself
         if z >= CORE_TOP:
             return None
-        cap_bot = max(z_top, HALF_PLATE_Z)
-        if z < cap_bot:
-            return water_core          # A4: coolant between blade top and cap
-        if z < min(cap_bot + ENDBOX_HEIGHT, CORE_TOP):
-            return end_box_homog       # the 14 cm cap
+        clad_top = min(z_top + BLADE_TOP_CLAD, CORE_TOP)
+        if z < clad_top:
+            return aluminum            # blade top clad riding on the B4C
+        if z < min(clad_top + ENDBOX_HEIGHT, CORE_TOP):
+            return end_box_homog       # the 14 cm cap riding on the clad
         return water                   # bulk water above the cap
 
     probes = [-31.0 + CLAD_EXT / 2.0, -HALF_Z / 2.0, 0.0, HALF_Z / 2.0,
@@ -1767,15 +1804,22 @@ def _run_blade_slot_checks(geom, f):
         assert got == want.name, \
             f"f={f}: absorber slot at z={z} is '{got}', expected '{want.name}'"
 
-    # A4 explicitly: at full insertion the cap must be coplanar with the
-    # surrounding end-boxes, and the 1 cm band below it must be coolant.
+    # Commit 17 explicitly: at full insertion the band [+30,+31] must be the
+    # aluminum top clad (the fig3 defect — previously water), the cap must be
+    # coplanar with the surrounding end-boxes, water above.
     if f == 0.0:
-        assert _material_at(geom, px, py, HALF_Z + CLAD_EXT / 2.0) == water_core.name, \
-            "A4: slot band [+30,+31] at f=0 must be core coolant water"
+        assert _material_at(geom, px, py, HALF_Z + BLADE_TOP_CLAD / 2.0) == aluminum.name, \
+            "blade top clad: slot band [+30,+31] at f=0 must be aluminum (fig3 defect)"
         assert _material_at(geom, px, py, ENDBOX_ABOVE_TOP - 0.5) == end_box_homog.name, \
-            "A4: cap must reach ENDBOX_ABOVE_TOP at f=0 (coplanar with end-boxes)"
+            "cap must reach ENDBOX_ABOVE_TOP at f=0 (coplanar with end-boxes)"
         assert _material_at(geom, px, py, ENDBOX_ABOVE_TOP + 0.5) == water.name, \
-            "A4: cap must stop at ENDBOX_ABOVE_TOP at f=0, water above"
+            "cap must stop at ENDBOX_ABOVE_TOP at f=0, water above"
+
+    # At full withdrawal it is the B4C that touches the model top: absorber at
+    # z=89.5 with nothing above it (clad and cap clipped away entirely).
+    if f == 1.0:
+        assert _material_at(geom, px, py, CORE_TOP - 0.5) == b4c.name, \
+            "f=1: B4C must reach CORE_TOP (z=89.5 probe) — clad clips, B4C does not"
 
     # B3 — the blade is ABSORBER_WIDTH (6.630) wide inside an ACTIVE_STACK_X
     # (6.640) slot. At the blade's own mid-height the centreline must be
@@ -1917,6 +1961,22 @@ if __name__ == '__main__':
     print("Overlap check (f=0.5) passed: no cell overlaps detected.")
     _run_point_checks(geometry_f05, 0.5)
     _run_blade_slot_checks(geometry_f05, 0.5)
+
+    # f=0.99 exercises the clipping band commit 17 introduced: for
+    # f > 59/60 (~0.98333) the cap is fully clipped away but the clad is only
+    # PARTIALLY clipped (here [89.4, 90]). Nothing else in the test set
+    # produces a partially-clipped clad with no cap above it — this is where
+    # undefined space would hide.
+    geometry_f099 = build_core_geometry(withdrawn_fraction=0.99)
+    debug_model_f099 = openmc.Model(
+        geometry=geometry_f099, materials=_materials, settings=_settings
+    )
+    with tempfile.TemporaryDirectory() as _debug_dir_f099:
+        debug_model_f099.run(geometry_debug=True, cwd=_debug_dir_f099)
+    print("Overlap check (f=0.99) passed: no cell overlaps detected "
+          "(partially-clipped clad, cap fully clipped).")
+    _run_point_checks(geometry_f099, 0.99)
+    _run_blade_slot_checks(geometry_f099, 0.99)
 
     # f=1.0 exercises the degenerate case introduced by the axial resize:
     # blade_z_top == CORE_TOP exactly (three coincident ZPlane objects at the
