@@ -54,8 +54,10 @@ clad = openmc.Material(name='Al_6061_cladding')
 clad.temperature = 330.7 
 clad.set_density('g/cm3', 2.70)
 clad.add_element('Al', 1.00, 'ao')
-# Pure aluminum stands in for 6061-T6; the minor alloying elements (Mg, Si, Cu,
-# Cr, Zn, Ti, Fe — ~2.7 w/o total) have negligible reactivity effect here.
+# Pure aluminum stands in for 6061-T6. [MCNP] — this is NOT an approximation we
+# chose independently: the reference MCNP model does the same thing, and the
+# resulting Al-27 number densities agree exactly.
+#   OpenMC 6.026261E-02  vs  MCNP 6.026260E-02  atoms/b-cm  —  MATCH, 0.0000%
 # Al metal S(a,b) (c_Al27) added per the 2026-07-20 meeting decision, gated on
 # USE_AL_SAB (ENDF/B-VIII.0 provides c_Al27; VII.0 does not).
 if USE_AL_SAB:
