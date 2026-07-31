@@ -137,8 +137,18 @@ b4c.set_density('sum')
 # =============================================================================
 # REFLECTOR MATERIAL
 # Graphite reflector blocks surrounding the core.
-# Density: [TECDOC] 1.7000 g/cm3 per the 2026-07-20 meeting decision (replaces
-# the deck-implied ~1.740 g/cm3 that the prior atom-density spec produced).
+#
+# Density: 2.26 g/cm3, natural (single-crystal) graphite. [MCNP] — team
+# decision recorded by Kyle, 2026-07-31. TECDOC-643 specifies NO graphite
+# density at all; the 1.7400 previously here was typical nuclear-grade
+# (porous) graphite and was an unsupported insertion, sourced from neither
+# TECDOC-643 nor the reference MCNP model.
+#
+# Isotopics are derived by OpenMC from natural abundance (add_element), not
+# hand-entered. For the cross-validation spreadsheet, 2.26 g/cm3 resolves to:
+#   C total  1.13313E-01 atoms/b-cm
+#   C-12     1.12101E-01  (98.93 at%)
+#   C-13     1.21245E-03  ( 1.07 at%)
 # =============================================================================
 
 graphite = openmc.Material(name='graphite_reflector')
@@ -146,9 +156,8 @@ graphite.temperature = 294.0                      # deck: $ 294.0
 if USE_NATURAL_CARBON:
     graphite.add_nuclide('C0', 1.0)
 else:
-    graphite.add_nuclide('C12', 0.9893)
-    graphite.add_nuclide('C13', 0.0107)
-graphite.set_density('g/cm3', 1.7400)
+    graphite.add_element('C', 1.0)
+graphite.set_density('g/cm3', 2.26)
 graphite.add_s_alpha_beta('c_Graphite')
 
 # =============================================================================
