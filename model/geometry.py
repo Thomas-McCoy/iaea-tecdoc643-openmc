@@ -603,6 +603,26 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
 
 ABSORBER_THICK  = 0.31
 
+# Absorber blade WIDTH (x). This is a different physical quantity from
+# ACTIVE_STACK_X = 6.640, the coolant channel width, which is unchanged and
+# stays a MATCH row. Before B3 the two were ALIASED: the absorber slot took its
+# x-extent straight from CTRL_FUEL_WIDTH_X (= ACTIVE_STACK_X), so the blade was
+# 6.640 wide by construction and there was no way to move one without the other.
+# They are now independent, and the assert below stops them being re-merged.
+ABSORBER_WIDTH  = 6.63   # cm                                          [MCNP]
+
+# The blade is narrower than the slot it sits in, so a thin water film runs
+# down each side of it. Residual, never a literal.
+ABSORBER_SIDE_WATER = (ACTIVE_STACK_X - ABSORBER_WIDTH) / 2.0   # 0.005 cm [DERIVED]
+
+assert ABSORBER_WIDTH != ACTIVE_STACK_X, (
+    "ABSORBER_WIDTH has been re-aliased to ACTIVE_STACK_X — the blade width "
+    "(6.630) and the coolant channel width (6.640) are different constants")
+assert 0.0 < ABSORBER_WIDTH < ACTIVE_STACK_X, \
+    "absorber blade must be positive and no wider than the slot it slides in"
+assert ABSORBER_SIDE_WATER > 0.0, \
+    "absorber side water film is degenerate — check ABSORBER_WIDTH"
+
 CTRL_FUEL_WIDTH_X   = ACTIVE_STACK_X
 CTRL_SIDE_PLATE_X   = SIDE_PLATE_THICK
 CTRL_AL_PLATE_THICK = 0.127   # cm (1.27 mm) [TECDOC] — was 0.15 (an Argonne
@@ -758,9 +778,17 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     assert abs(top_guide_top.y0 - (ELEM_Y / 2.0 - CTRL_OUTER_OFFSET)) < 1e-9, \
         "control end-block budget does not reach the element wall (top)"
 
-    # Hf slot x/y footprints (unbounded in z — blade cells own their z-range)
+    # Hf slot x/y footprints (unbounded in z — blade cells own their z-range).
+    # The SLOT is ACTIVE_STACK_X wide (6.640, the coolant channel width); the
+    # BLADE inside it is ABSORBER_WIDTH wide (6.630). Keeping the slot at the
+    # full channel width leaves the not_hf_slots end-box exclusion below
+    # untouched and puts the side-water film inside the slot, where it belongs.
     hf_slot_b = +bot_hf_bot & -bot_hf_top & +side_inner_left & -side_inner_right
     hf_slot_t = +top_hf_bot & -top_hf_top & +side_inner_left & -side_inner_right
+
+    blade_x_left  = openmc.XPlane(x0=-ABSORBER_WIDTH / 2.0)
+    blade_x_right = openmc.XPlane(x0= ABSORBER_WIDTH / 2.0)
+    blade_x       = +blade_x_left & -blade_x_right
 
     # ── Bottom sandwich structural cells (active zone only) ─────────────────
     # Wall -> fuel: offset water | outer guide | blade water | [blade] |
@@ -826,12 +854,24 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     # ── Fixed-length B4C blade ───────────────────────────────────────────────
     # B4C occupies [z_bot, z_top] in the Hf-slot band, unbounded by axial
     # region (spans across active/end-box/water boundaries as one piece).
+    blade_z = +blade_z_bot & -blade_z_top
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_absorber_bottom', fill=b4c,
-        region=hf_slot_b & +blade_z_bot & -blade_z_top))
+        region=hf_slot_b & blade_x & blade_z))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_absorber_top', fill=b4c,
-        region=hf_slot_t & +blade_z_bot & -blade_z_top))
+        region=hf_slot_t & blade_x & blade_z))
+
+    # ABSORBER_SIDE_WATER film down each side of the blade — the slot is
+    # ACTIVE_STACK_X wide, the blade ABSORBER_WIDTH. Without these the two
+    # 0.005 cm slivers beside each blade are undefined space, which passes an
+    # overlap check and leaks particles.
+    cells.append(openmc.Cell(
+        name=f'ctrl{elem_id}_blade_side_water_bottom', fill=water_core,
+        region=hf_slot_b & ~blade_x & blade_z))
+    cells.append(openmc.Cell(
+        name=f'ctrl{elem_id}_blade_side_water_top', fill=water_core,
+        region=hf_slot_t & ~blade_x & blade_z))
 
     # Water below the blade, down to the BOTTOM OF THE PLATES (−31), not the
     # bottom of the meat. The lower end-box now stops at −31 and carries no
@@ -1537,8 +1577,24 @@ def _run_blade_slot_checks(geom, f):
         assert _material_at(geom, px, py, ENDBOX_ABOVE_TOP + 0.5) == water.name, \
             "A4: cap must stop at ENDBOX_ABOVE_TOP at f=0, water above"
 
+    # B3 — the blade is ABSORBER_WIDTH (6.630) wide inside an ACTIVE_STACK_X
+    # (6.640) slot. At the blade's own mid-height the centreline must be
+    # absorber and the side film must be coolant.
+    z_mid_blade = (z_bot + z_top) / 2.0
+    on_blade = _material_at(geom, px, py, z_mid_blade)
+    assert on_blade == b4c.name, \
+        f"f={f}: blade centreline at z={z_mid_blade} is '{on_blade}', " \
+        f"expected '{b4c.name}'"
+    film_x = ex + ACTIVE_STACK_X / 2.0 - ABSORBER_SIDE_WATER / 2.0
+    film = _material_at(geom, film_x, py, z_mid_blade)
+    assert film is not None, \
+        f"f={f}: blade side-water film at x={film_x} is UNDEFINED SPACE"
+    assert film == water_core.name, \
+        f"f={f}: blade side-water film is '{film}', expected '{water_core.name}'"
+
     print(f"  slot checks  (f={f}): absorber slot stack resolves correctly "
-          f"(blade z=[{z_bot:.1f}, {z_top:.1f}])")
+          f"(blade z=[{z_bot:.1f}, {z_top:.1f}], "
+          f"{ABSORBER_SIDE_WATER:.4f} cm side film present)")
 
 
 if __name__ == '__main__':
