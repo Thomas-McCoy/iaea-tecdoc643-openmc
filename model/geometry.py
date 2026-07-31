@@ -44,7 +44,7 @@ Control blade model — fixed-length sliding absorber:
     withdrawn_fraction f in [0, 1]:
         z_bot = -30 + f * 60   → f=0: -30,  f=1: +30
         z_top = z_bot + 60     → f=0: +30,  f=1: +90 (= CORE_TOP at f=1)
-    b4c fills the Hf-slot x/y band for z in [z_bot, z_top]. An ENDBOX_HEIGHT
+    b4c fills the absorber-slot x/y band for z in [z_bot, z_top]. An ENDBOX_HEIGHT
     (14 cm) homogenized (end_box_homog) end-box cap rides above the blade in
     the blade's own slot footprint, with its bottom at
     max(z_top, HALF_PLATE_Z) — see the A4 note in the control-element section.
@@ -175,8 +175,8 @@ assert STD_END_WATER > 0, "standard element end water gap must be positive"
 # Flux trap cylindrical water hole radius.
 # ASSUMED 2.5 cm (inscribed radius of the 50 mm square hole).
 # Area-equivalent radius would be 5/sqrt(pi) ~2.8209 cm.
-# VERIFY against Kyle's MCNP deck — if the deck uses a CYL surface
-# with a different radius, update FT_HOLE_RADIUS here.
+# A1 is OPEN: the reference MCNP model uses 2.820 (area-equivalent). Kyle to
+# look and decide — do not change this value in the meantime.
 FT_HOLE_RADIUS = 2.5         # cm
 
 # HALF_Z is the ACTIVE MEAT half-height and must track MEAT_HEIGHT, not ELEM_Z.
@@ -598,7 +598,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
 # Fixed-length sliding blade:
 #   The B4C absorber blade is BLADE_LENGTH=60 cm long and translates in z.
 #   At fraction f, the blade occupies z=[z_bot, z_top] = [-30+f*60, +30+f*60].
-#   b4c fills the Hf-slot x/y band for z in [z_bot, z_top] across the full
+#   b4c fills the absorber-slot x/y band for z in [z_bot, z_top] across the full
 #   model height. Below z_bot, water fills the slot down to the plate bottom
 #   (-31) — the blade never dips below z=-30, so the lower end-box/water are
 #   uniform material with no reserved slot at all. Above z_top, the slot's own
@@ -638,7 +638,10 @@ CTRL_SIDE_PLATE_X   = SIDE_PLATE_THICK
 # the MCNP model's 0.150 is being corrected there. Do not change this to match.
 CTRL_AL_PLATE_THICK = 0.127   # cm (1.27 mm) [TECDOC] — was 0.15 (an Argonne
                               # TH-analysis convenience); reverted 2026-07-20.
-CTRL_HF_THICK       = ABSORBER_THICK
+# CTRL_HF_THICK removed 2026-07-31: a dead Hf-era alias of ABSORBER_THICK,
+# defined but never read anywhere in the repository. Use ABSORBER_THICK (y) and
+# ABSORBER_WIDTH (x) — an unused second name for a blade dimension is exactly
+# how the B3 blade-width/channel-width aliasing happened in the first place.
 
 N_CTRL_FUEL_PLATES  = 17
 CTRL_PLATE_PITCH    = PLATE_THICK_INNER + WATER_CHAN_THICK   # 0.346 cm
@@ -719,7 +722,7 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     assert z_top <= CORE_TOP, (
         f"ctrl{elem_id}: blade top {z_top:.2f} > CORE_TOP {CORE_TOP}")
     # These two are the sole justification for (a) merging the lower end-box/
-    # water into uniform material with no Hf-slot exclusion, and (b) never
+    # water into uniform material with no absorber-slot exclusion, and (b) never
     # needing an "above-active" water-gap cell (the blade always reaches at
     # least the top of the active zone). If travel or geometry parameters
     # ever change so these fail, both simplifications below become wrong.
@@ -771,9 +774,9 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     #   B4C blade slot | blade water (g) | outer guide (Al) | outer offset water
     bot_slider_top = openmc.YPlane(y0=y_fuel_start - CTRL_FEEDER_CHANNEL)
     bot_slider_bot = openmc.YPlane(y0=bot_slider_top.y0 - CTRL_AL_PLATE_THICK)
-    bot_hf_top     = openmc.YPlane(y0=bot_slider_bot.y0 - CTRL_BLADE_WATER)
-    bot_hf_bot     = openmc.YPlane(y0=bot_hf_top.y0 - ABSORBER_THICK)
-    bot_guide_top  = openmc.YPlane(y0=bot_hf_bot.y0 - CTRL_BLADE_WATER)
+    bot_slot_top     = openmc.YPlane(y0=bot_slider_bot.y0 - CTRL_BLADE_WATER)
+    bot_slot_bot     = openmc.YPlane(y0=bot_slot_top.y0 - ABSORBER_THICK)
+    bot_guide_top  = openmc.YPlane(y0=bot_slot_bot.y0 - CTRL_BLADE_WATER)
     bot_offset_top = openmc.YPlane(y0=bot_guide_top.y0 - CTRL_AL_PLATE_THICK)
     # bot_offset_top should coincide with elem_front + CTRL_OUTER_OFFSET
     assert abs(bot_offset_top.y0 - (-ELEM_Y / 2.0 + CTRL_OUTER_OFFSET)) < 1e-9, \
@@ -782,20 +785,20 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     # Top end block — mirror image, built outward from the fuel stack to the wall.
     top_slider_bot = openmc.YPlane(y0=y_fuel_end + CTRL_FEEDER_CHANNEL)
     top_slider_top = openmc.YPlane(y0=top_slider_bot.y0 + CTRL_AL_PLATE_THICK)
-    top_hf_bot     = openmc.YPlane(y0=top_slider_top.y0 + CTRL_BLADE_WATER)
-    top_hf_top     = openmc.YPlane(y0=top_hf_bot.y0 + ABSORBER_THICK)
-    top_guide_bot  = openmc.YPlane(y0=top_hf_top.y0 + CTRL_BLADE_WATER)
+    top_slot_bot     = openmc.YPlane(y0=top_slider_top.y0 + CTRL_BLADE_WATER)
+    top_slot_top     = openmc.YPlane(y0=top_slot_bot.y0 + ABSORBER_THICK)
+    top_guide_bot  = openmc.YPlane(y0=top_slot_top.y0 + CTRL_BLADE_WATER)
     top_guide_top  = openmc.YPlane(y0=top_guide_bot.y0 + CTRL_AL_PLATE_THICK)
     assert abs(top_guide_top.y0 - (ELEM_Y / 2.0 - CTRL_OUTER_OFFSET)) < 1e-9, \
         "control end-block budget does not reach the element wall (top)"
 
-    # Hf slot x/y footprints (unbounded in z — blade cells own their z-range).
+    # Absorber slot x/y footprints (unbounded in z — blade cells own their z-range).
     # The SLOT is ACTIVE_STACK_X wide (6.640, the coolant channel width); the
     # BLADE inside it is ABSORBER_WIDTH wide (6.630). Keeping the slot at the
-    # full channel width leaves the not_hf_slots end-box exclusion below
+    # full channel width leaves the not_slots end-box exclusion below
     # untouched and puts the side-water film inside the slot, where it belongs.
-    hf_slot_b = +bot_hf_bot & -bot_hf_top & +side_inner_left & -side_inner_right
-    hf_slot_t = +top_hf_bot & -top_hf_top & +side_inner_left & -side_inner_right
+    slot_b = +bot_slot_bot & -bot_slot_top & +side_inner_left & -side_inner_right
+    slot_t = +top_slot_bot & -top_slot_top & +side_inner_left & -side_inner_right
 
     blade_x_left  = openmc.XPlane(x0=-ABSORBER_WIDTH / 2.0)
     blade_x_right = openmc.XPlane(x0= ABSORBER_WIDTH / 2.0)
@@ -817,15 +820,15 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_blade_water_outer_bottom', fill=water_core,
-        region=(+bot_guide_top & -bot_hf_bot &
+        region=(+bot_guide_top & -bot_slot_bot &
                 +side_inner_left & -side_inner_right & plate_z)))
 
-    # (Hf slot cells are handled separately below — not bounded to plate_z)
+    # (Absorber slot cells are handled separately below — not bounded to plate_z)
     #  they own their own z-ranges, driven by the blade position.
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_blade_water_inner_bottom', fill=water_core,
-        region=(+bot_hf_top & -bot_slider_bot &
+        region=(+bot_slot_top & -bot_slider_bot &
                 +side_inner_left & -side_inner_right & plate_z)))
 
     cells.append(openmc.Cell(
@@ -844,12 +847,12 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_blade_water_inner_top', fill=water_core,
-        region=(+top_slider_top & -top_hf_bot &
+        region=(+top_slider_top & -top_slot_bot &
                 +side_inner_left & -side_inner_right & plate_z)))
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_blade_water_outer_top', fill=water_core,
-        region=(+top_hf_top & -top_guide_bot &
+        region=(+top_slot_top & -top_guide_bot &
                 +side_inner_left & -side_inner_right & plate_z)))
 
     cells.append(openmc.Cell(
@@ -863,15 +866,15 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
                 +side_inner_left & -side_inner_right & plate_z)))
 
     # ── Fixed-length B4C blade ───────────────────────────────────────────────
-    # B4C occupies [z_bot, z_top] in the Hf-slot band, unbounded by axial
+    # B4C occupies [z_bot, z_top] in the absorber-slot band, unbounded by axial
     # region (spans across active/end-box/water boundaries as one piece).
     blade_z = +blade_z_bot & -blade_z_top
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_absorber_bottom', fill=b4c,
-        region=hf_slot_b & blade_x & blade_z))
+        region=slot_b & blade_x & blade_z))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_absorber_top', fill=b4c,
-        region=hf_slot_t & blade_x & blade_z))
+        region=slot_t & blade_x & blade_z))
 
     # ABSORBER_SIDE_WATER film down each side of the blade — the slot is
     # ACTIVE_STACK_X wide, the blade ABSORBER_WIDTH. Without these the two
@@ -879,10 +882,10 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     # overlap check and leaks particles.
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_blade_side_water_bottom', fill=water_core,
-        region=hf_slot_b & ~blade_x & blade_z))
+        region=slot_b & ~blade_x & blade_z))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_blade_side_water_top', fill=water_core,
-        region=hf_slot_t & ~blade_x & blade_z))
+        region=slot_t & ~blade_x & blade_z))
 
     # Water below the blade, down to the BOTTOM OF THE PLATES (−31), not the
     # bottom of the meat. The lower end-box now stops at −31 and carries no
@@ -892,14 +895,14 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     # water regardless of f.
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_slot_b_water_below', fill=water_core,
-        region=hf_slot_b & +_z_plate_bot & -blade_z_bot))
+        region=slot_b & +_z_plate_bot & -blade_z_bot))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_slot_t_water_below', fill=water_core,
-        region=hf_slot_t & +_z_plate_bot & -blade_z_bot))
+        region=slot_t & +_z_plate_bot & -blade_z_bot))
 
     # ── Moving homogenized end-box cap (A4, resolved 2026-07-31: Option B) ──
     # An ENDBOX_HEIGHT (14 cm) end_box_homog cap rides above the blade in the
-    # Hf-slot x/y band, clipped at CORE_TOP; above the cap the slot is water
+    # absorber-slot x/y band, clipped at CORE_TOP; above the cap the slot is water
     # (294 K) up to CORE_TOP.
     #
     # The cap bottom is max(z_top, HALF_PLATE_Z), NOT z_top. B1 shortened the
@@ -932,24 +935,24 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
         if cap_bot_z > z_top:
             cells.append(openmc.Cell(
                 name=f'ctrl{elem_id}_slot_b_water_under_cap', fill=water_core,
-                region=hf_slot_b & +blade_z_top & -blade_cap_bot))
+                region=slot_b & +blade_z_top & -blade_cap_bot))
             cells.append(openmc.Cell(
                 name=f'ctrl{elem_id}_slot_t_water_under_cap', fill=water_core,
-                region=hf_slot_t & +blade_z_top & -blade_cap_bot))
+                region=slot_t & +blade_z_top & -blade_cap_bot))
 
         cells.append(openmc.Cell(
             name=f'ctrl{elem_id}_blade_cap_slot_b', fill=end_box_homog,
-            region=hf_slot_b & +blade_cap_bot & -blade_cap_top))
+            region=slot_b & +blade_cap_bot & -blade_cap_top))
         cells.append(openmc.Cell(
             name=f'ctrl{elem_id}_blade_cap_slot_t', fill=end_box_homog,
-            region=hf_slot_t & +blade_cap_bot & -blade_cap_top))
+            region=slot_t & +blade_cap_bot & -blade_cap_top))
         if blade_cap_top.z0 < CORE_TOP:
             cells.append(openmc.Cell(
                 name=f'ctrl{elem_id}_water_above_cap_slot_b', fill=water,
-                region=hf_slot_b & +blade_cap_top & -_z_model_top))
+                region=slot_b & +blade_cap_top & -_z_model_top))
             cells.append(openmc.Cell(
                 name=f'ctrl{elem_id}_water_above_cap_slot_t', fill=water,
-                region=hf_slot_t & +blade_cap_top & -_z_model_top))
+                region=slot_t & +blade_cap_top & -_z_model_top))
 
     # ── 17-plate fuel follower (active zone only) ───────────────────────────
 
@@ -969,9 +972,9 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
         meat_b = openmc.YPlane(y0=plate_bot + CLAD_THICK_INNER)
         meat_t = openmc.YPlane(y0=plate_top - CLAD_THICK_INNER)
         # The meat y-band lies inside the follower stack [-2.8315, +2.8315];
-        # the Hf slots sit at |y| in [3.3165, 3.6265], outside it. Meat and
+        # the absorber slots sit at |y| in [3.3165, 3.6265], outside it. Meat and
         # absorber slot are disjoint in y, so the axial zone cut below cannot
-        # interact with the blade cells or the not_hf_slots complement.
+        # interact with the blade cells or the not_slots complement.
         meat_xy = +meat_b & -meat_t & +meat_left & -meat_right
         meat_region = meat_xy & +meat_zbot & -meat_ztop
         clad_region = (
@@ -1040,7 +1043,7 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
                 +elem_back & -pitch_back & plate_z)))
 
     # ── Axial regions above/below active fuel ───────────────────────────────
-    # Upper end-box/water still exclude the Hf-slot footprint (handled above,
+    # Upper end-box/water still exclude the absorber-slot footprint (handled above,
     # since the blade can reach into them). Lower end-box/water need NO such
     # exclusion: the blade never enters z<-HALF_Z (asserted above), so that
     # band is uniform material straight through — no reserved gap. End-box is
@@ -1048,14 +1051,14 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     # subdivision (the end-box material is already a homogenized Al/water
     # mixture, so a physical gap slice within it is not meaningful).
     full_pitch   = +pitch_left & -pitch_right & +pitch_front & -pitch_back
-    not_hf_slots = ~hf_slot_b & ~hf_slot_t   # complement of both Hf slot footprints
+    not_slots = ~slot_b & ~slot_t   # complement of both absorber slot footprints
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_upper_endbox', fill=end_box_homog,
-        region=full_pitch & +_z_plate_top & -_z_endbox_above & not_hf_slots))
+        region=full_pitch & +_z_plate_top & -_z_endbox_above & not_slots))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_upper_water', fill=water,
-        region=full_pitch & +_z_endbox_above & -_z_model_top & not_hf_slots))
+        region=full_pitch & +_z_endbox_above & -_z_model_top & not_slots))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_lower_endbox', fill=end_box_homog,
         region=full_pitch & +_z_endbox_below & -_z_plate_bot))
@@ -1074,7 +1077,7 @@ def make_flux_trap():
     """
     Flux trap: aluminum block with a central cylindrical water hole (water_core
     at 316.8 K, the same core coolant water used throughout the core), matching
-    the MCNP deck which models the hole as a ZCylinder rather than the
+    the reference MCNP model, which models the hole as a ZCylinder rather than the
     originally-commented square.
 
     The aluminum block is FT_BLOCK_X x FT_BLOCK_Y = 7.6 x 8.0 cm inside the
