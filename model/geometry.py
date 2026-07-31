@@ -662,9 +662,18 @@ CTRL_FUEL_STACK_HALF = (N_CTRL_FUEL_PLATES * PLATE_THICK_INNER
 # plate-to-plate channel in the stack above it.
 CTRL_FEEDER_CHANNEL = WATER_CHAN_THICK   # 0.219 cm [DERIVED — standard channel]
 
-# Gap between the outer guide plate and the element wall, likewise set to the
-# standard-element end gap.
-CTRL_OUTER_OFFSET = STD_END_WATER   # 0.1075 cm [DERIVED, 2026-07-20 meeting]
+# Control-element outer offset — the water between the outer guide plate and
+# the element wall. De-aliased from STD_END_WATER (2026-07-31, closes A3): the
+# standard element's exterior channel (0.1075, a derived residual of the plate
+# stack) and the control element's outer offset are physically different
+# things and should never have shared a constant, regardless of value.
+#
+# [MCNP-PROVISIONAL] 0.1305: Kyle approved 0.1305 (outer offset) / 0.1275
+# (derived blade water) but sourced them as "the same one as that figure in
+# the report" — the PRO-X figure, which is not a governing source per project
+# rules. Pending confirmation that the reference MCNP model's surface cards
+# give 0.1305 directly. Upgrade to [MCNP] when confirmed.
+CTRL_OUTER_OFFSET = 0.1305   # cm [MCNP-PROVISIONAL]
 
 # End-block budget: everything between the fuel stack edge and the wall.
 CTRL_END_BLOCK = ELEM_Y / 2.0 - CTRL_FUEL_STACK_HALF   # 1.1685 cm
@@ -675,8 +684,18 @@ CTRL_END_BLOCK = ELEM_Y / 2.0 - CTRL_FUEL_STACK_HALF   # 1.1685 cm
 CTRL_BLADE_WATER = (CTRL_END_BLOCK - CTRL_FEEDER_CHANNEL
                     - 2.0 * CTRL_AL_PLATE_THICK - ABSORBER_THICK
                     - CTRL_OUTER_OFFSET) / 2.0
-# With the 2026-07-20 values this evaluates to exactly:
-#   (1.1685 - 0.219 - 2*0.127 - 0.31 - 0.1075) / 2 = 0.139 cm
+# With CTRL_OUTER_OFFSET = 0.1305 this evaluates to exactly:
+#   (1.1685 - 0.219 - 2*0.127 - 0.31 - 0.1305) / 2 = 0.1275 cm
+
+# Kyle quoted 0.1275 alongside 0.1305; hardcoding both would over-determine
+# the end-block budget, so 0.1275 stays derived and this assert VALIDATES his
+# number against the budget instead of trusting it. The PRO-X drawing's own
+# closure (1.305 + 1.27 + 5.65 + 1.27 + 2.19 = 11.685 mm) is the same check
+# from the other end.
+assert abs(CTRL_BLADE_WATER - 0.1275) < 1e-9, (
+    f"CTRL_BLADE_WATER derives to {CTRL_BLADE_WATER:.6f}, not the 0.1275 the "
+    f"2026-07-31 A3 decision quotes — the end-block budget no longer closes "
+    f"on Kyle's pair (outer offset {CTRL_OUTER_OFFSET})")
 
 assert CTRL_BLADE_WATER >= 0.05, (
     f"CTRL_BLADE_WATER={CTRL_BLADE_WATER:.5f} cm is degenerate for "
@@ -1742,6 +1761,34 @@ def _run_blade_slot_checks(geom, f):
         f"f={f}: blade side-water film at x={film_x} is UNDEFINED SPACE"
     assert film == water_core.name, \
         f"f={f}: blade side-water film is '{film}', expected '{water_core.name}'"
+
+    # A3 — full end-block y-stack walk, wall to fuel stack (bottom end block).
+    # Each layer is probed at its own centre; a wrong material here means the
+    # 0.1305 / 0.1275 layer budget is mis-built, not merely mis-stated. The
+    # absorber layer is probed at the blade's mid-height (it must contain the
+    # blade); the structural/water layers at z=0 (they span the plate height).
+    end_block_layers = [
+        (CTRL_OUTER_OFFSET,    water_core, 'offset water'),
+        (CTRL_AL_PLATE_THICK,  aluminum,   'outer guide plate'),
+        (CTRL_BLADE_WATER,     water_core, 'blade water, outer'),
+        (ABSORBER_THICK,       b4c,        'absorber slot'),
+        (CTRL_BLADE_WATER,     water_core, 'blade water, inner'),
+        (CTRL_AL_PLATE_THICK,  aluminum,   'inner guide plate'),
+        (CTRL_FEEDER_CHANNEL,  water_core, 'feeder channel'),
+    ]
+    y_walk = ey - ELEM_Y / 2.0                 # element wall (bottom)
+    for thick, want, label in end_block_layers:
+        y_c = y_walk + thick / 2.0
+        z_probe = z_mid_blade if want is b4c else 0.0
+        got = _material_at(geom, ex, y_c, z_probe)
+        assert got is not None, \
+            f"f={f}: end-block '{label}' at y={y_c:.4f} is UNDEFINED SPACE"
+        assert got == want.name, (
+            f"f={f}: end-block '{label}' at y={y_c:.4f} is '{got}', "
+            f"expected '{want.name}'")
+        y_walk += thick
+    assert abs(y_walk - (ey - CTRL_FUEL_STACK_HALF)) < 1e-9, \
+        "end-block layer walk does not land on the fuel stack edge"
 
     print(f"  slot checks  (f={f}): absorber slot stack resolves correctly "
           f"(blade z=[{z_bot:.1f}, {z_top:.1f}], "
