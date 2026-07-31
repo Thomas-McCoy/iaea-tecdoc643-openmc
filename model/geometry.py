@@ -172,12 +172,19 @@ STD_STACK_HEIGHT = (2 * PLATE_THICK_OUTER
 STD_END_WATER = (ELEM_Y - STD_STACK_HEIGHT) / 2.0             # 0.1075 cm  [DERIVED]
 assert STD_END_WATER > 0, "standard element end water gap must be positive"
 
-# Flux trap cylindrical water hole radius.
-# ASSUMED 2.5 cm (inscribed radius of the 50 mm square hole).
-# Area-equivalent radius would be 5/sqrt(pi) ~2.8209 cm.
-# A1 is OPEN: the reference MCNP model uses 2.820 (area-equivalent). Kyle to
-# look and decide — do not change this value in the meantime.
-FT_HOLE_RADIUS = 2.5         # cm
+# Flux trap cylindrical water hole radius. [MCNP] — Kyle confirmed, closes A1
+# (2026-07-31). Area-equivalent to the 50 mm square hole: 25 cm^2 gives
+# r = 5/sqrt(pi) = 2.8209 cm, carried as 2.820 per the reference MCNP model.
+# (The old 2.500 was the inscribed radius of the same square, [ASSUMED].)
+FT_HOLE_RADIUS = 2.820       # cm [MCNP]
+
+# The hole must clear the 7.6 x 8.0 flux-trap block on both axes — with 2.820
+# the aluminum margins are (7.6 - 5.64)/2 = 0.98 cm in x and
+# (8.0 - 5.64)/2 = 1.18 cm in y.
+assert 2 * FT_HOLE_RADIUS < FT_BLOCK_X, \
+    "flux-trap hole diameter exceeds the block in x"
+assert 2 * FT_HOLE_RADIUS < FT_BLOCK_Y, \
+    "flux-trap hole diameter exceeds the block in y"
 
 # HALF_Z is the ACTIVE MEAT half-height and must track MEAT_HEIGHT, not ELEM_Z.
 # Since B1 the two differ (60 vs 62): the blade travel, the meat cells and the
@@ -1104,7 +1111,8 @@ def make_flux_trap():
     The axial end-box (homogenized water/Al) region above and below stays one
     solid FULL-PITCH block — no gap subdivision there.
 
-    Cylinder: radius FT_HOLE_RADIUS = 2.5 cm, centered at element origin (x=0, y=0).
+    Cylinder: radius FT_HOLE_RADIUS = 2.820 cm (area-equivalent to the 50 mm
+    square hole), centered at element origin (x=0, y=0).
     The cylinder is axially unbounded within the plate height (plate_z clips it).
     Aluminum fills the annular region between the cylinder and the pitch envelope.
     """
@@ -1662,6 +1670,19 @@ def _run_point_checks(geom, f):
         assert top == solid.name, \
             f"f={f}: '{tok}' block at z={z_mid_clad_ext} is '{top}', " \
             f"expected '{solid.name}'"
+        if tok == 'F':
+            # A1 — the 2.820 cm water hole: coolant at the hole centre, and
+            # still aluminum in the annulus between hole edge and block edge
+            # (the x margin is the thin one, 0.98 cm at 2.820).
+            centre = _material_at(geom, bx, by, 0.0)
+            assert centre == water_core.name, \
+                f"f={f}: flux-trap hole centre is '{centre}', " \
+                f"expected '{water_core.name}'"
+            annulus_x = bx + (FT_HOLE_RADIUS + FT_BLOCK_X / 2.0) / 2.0
+            ann = _material_at(geom, annulus_x, by, 0.0)
+            assert ann == aluminum.name, \
+                f"f={f}: flux-trap annulus at x-offset " \
+                f"{annulus_x - bx:.3f} is '{ann}', expected '{aluminum.name}'"
 
     # B4 — pool water. Probed 30 cm outboard of the core edge on each lateral
     # face (inside the 38.5 cm pool), plus both diagonal corners, which is where
