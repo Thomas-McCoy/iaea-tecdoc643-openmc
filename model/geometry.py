@@ -10,20 +10,33 @@ Reference:
     Appendix A-2: Generic 10 MW Reactor — Argonne National Laboratory.
 
 Core Layout:
-    - 5x6 active core in 8x9 grid
-    - 23 standard fuel elements, 5 control fuel elements, 2 flux traps
+    - 7x6 core positions (TECDOC-643 A-2 Table 1 quotes 8x9 grid-plate
+      positions, which counts the surrounding water ring)
+    - 23 standard fuel elements, 5 control fuel elements, 2 flux traps,
+      12 graphite reflector positions = 42 = 7x6
     - Lattice pitch: 77 mm x 81 mm
-    - Active fuel height: 60 cm
+    - Active fuel meat height: 60 cm; plate height 62 cm
 
-Axial model structure (deck-confirmed, symmetric about z=0):
+Axial model structure (symmetric about z=0):
     CORE_BOTTOM = -90 cm  (vacuum)
     [-90, -45]  : 45 cm light water
-    [-45, -30]  : 15 cm homogenized end-box (0.25 Al / 0.75 H₂O by volume)
-    [-30, +30]  : 60 cm active fuel region
-    [+30, +45]  : 15 cm homogenized end-box
+    [-45, -31]  : 14 cm homogenized end-box (0.25 Al / 0.75 H₂O by volume)
+    [-31, -30]  :  1 cm unfueled clad extension
+    [-30, +30]  : 60 cm active fuel meat
+    [+30, +31]  :  1 cm unfueled clad extension
+    [+31, +45]  : 14 cm homogenized end-box
     [+45, +90]  : 45 cm light water
     CORE_TOP    = +90 cm  (vacuum) — COINCIDES with the fully-withdrawn (f=1)
                   blade top; no water cap above the withdrawn blade.
+    Sum check: 2 * (45 + 14 + 1 + 30) = 180 cm — tripwired below.
+
+Lateral model structure:
+    The 7x6 lattice is enclosed in an explicit water-filled pool box whose
+    lateral faces sit POOL_WATER_THICK = 38.5 cm outboard of the core
+    envelope. Vacuum boundary at the pool faces.
+        x: 6 * 7.7 + 2 * 38.5 = 123.2 cm
+        y: 7 * 8.1 + 2 * 38.5 = 133.7 cm
+    Pool water is the 294 K bulk water material, NOT the 316.8 K core coolant.
 
 Control blade model — fixed-length sliding absorber:
     BLADE_LENGTH = 60 cm (rigid; never changes)
@@ -31,16 +44,18 @@ Control blade model — fixed-length sliding absorber:
     withdrawn_fraction f in [0, 1]:
         z_bot = -30 + f * 60   → f=0: -30,  f=1: +30
         z_top = z_bot + 60     → f=0: +30,  f=1: +90 (= CORE_TOP at f=1)
-    b4c fills the Hf-slot x/y band for z in [z_bot, z_top]. A 15 cm homogenized
-    (end_box_homog) end-box cap is RIGIDLY ATTACHED to the top of the blade and
-    translates with it, occupying the blade's own slot footprint over
-    z=[z_top, min(z_top+15, CORE_TOP)]; above the cap the slot is water up to
-    CORE_TOP. At f=0 the cap sits at [+30,+45], coplanar with the surrounding
-    end-boxes. At f=1 the blade top coincides with CORE_TOP (z_top == +90), so
-    the cap is pushed entirely out of the model and is NOT created — the blade
-    itself fills the slot to the top, exactly as before.
-    All other cells (guide plates, fuel, channels, etc.) are restricted
-    to the active zone z=[-30, +30]; end-box/water cells cover z outside.
+    b4c fills the Hf-slot x/y band for z in [z_bot, z_top]. An ENDBOX_HEIGHT
+    (14 cm) homogenized (end_box_homog) end-box cap rides above the blade in
+    the blade's own slot footprint, with its bottom at
+    max(z_top, HALF_PLATE_Z) — see the A4 note in the control-element section.
+    At f=0 the cap sits at [+31,+45], COPLANAR with the surrounding end-boxes
+    (2026-07-20 decision), and the 1 cm slot band [+30,+31] between the blade
+    top and the cap is core coolant water. At f=1 the blade top coincides with
+    CORE_TOP (z_top == +90), so the cap is pushed entirely out of the model and
+    is NOT created — the blade itself fills the slot to the top.
+    Plate/clad, structural and channel cells run the full plate height
+    z=[-31, +31]; only the fuel meat is restricted to z=[-30, +30].
+    End-box/water cells cover z outside [-31, +31].
 
 Standard Fuel Element (LEU, U3Si2-Al, heterogeneous build):
     - Envelope:           76 x 80 mm
@@ -50,6 +65,7 @@ Standard Fuel Element (LEU, U3Si2-Al, heterogeneous build):
                           both faces of the meat at the outer 0.495 mm
                           thickness, not just the face away from the stack)
     - Fuel meat:          0.51 mm thick x 63 mm wide x 600 mm tall
+    - Plate height:       620 mm (600 mm meat + 10 mm unfueled clad each end)
     - Inner clad:         0.38 mm  |  Outer clad: 0.495 mm
 
 All dimensions in cm.
@@ -68,7 +84,21 @@ PITCH_Y = 8.1    # cm  (81 mm)
 
 ELEM_X = 7.6     # cm  (76 mm)
 ELEM_Y = 8.0     # cm  (80 mm)
-ELEM_Z = 60.0    # cm  (600 mm) — active fuel height
+
+# --- Axial plate / meat heights ---------------------------------------------
+# The reference MCNP model carries 1 cm of UNFUELED cladding above and below
+# the active meat: the plates stand 62 cm tall with 60 cm of meat inside them.
+# MEAT_HEIGHT and PLATE_HEIGHT are INDEPENDENT primaries; the clad extension is
+# derived from the pair and is never written as a literal anywhere.
+MEAT_HEIGHT  = 60.0   # cm (600 mm) — active fuel meat height  [TECDOC] (MCNP MATCH)
+PLATE_HEIGHT = 62.0   # cm (620 mm) — fuel / unfueled plate height   [MCNP]
+CLAD_EXT     = (PLATE_HEIGHT - MEAT_HEIGHT) / 2.0   # 1.0 cm          [DERIVED]
+
+assert CLAD_EXT > 0, "PLATE_HEIGHT must exceed MEAT_HEIGHT (clad extension <= 0)"
+
+# Element dimension (Z). Side plates, unfueled control plates, flux-trap blocks
+# and reflector blocks all run the full plate height, not the meat height.
+ELEM_Z = PLATE_HEIGHT   # 62.0 cm                                     [MCNP]
 
 # Inter-element water gap — documentation/tripwire only. Feeds no surface or
 # cell directly; every gap cell derives its width from the pitch/envelope
@@ -120,7 +150,15 @@ assert STD_END_WATER > 0, "standard element end water gap must be positive"
 # with a different radius, update FT_HOLE_RADIUS here.
 FT_HOLE_RADIUS = 2.5         # cm
 
-HALF_Z = ELEM_Z / 2.0       # 30.0 cm
+# HALF_Z is the ACTIVE MEAT half-height and must track MEAT_HEIGHT, not ELEM_Z.
+# Since B1 the two differ (60 vs 62): the blade travel, the meat cells and the
+# depletion zone tiling all key off HALF_Z, and deriving it from ELEM_Z would
+# silently move the meat to +/-31 along with the plates.
+HALF_Z       = MEAT_HEIGHT / 2.0     # 30.0 cm — active meat half-height  [DERIVED]
+HALF_PLATE_Z = PLATE_HEIGHT / 2.0    # 31.0 cm — plate / clad half-height [DERIVED]
+
+assert abs(HALF_PLATE_Z - (HALF_Z + CLAD_EXT)) < 1e-12, \
+    "HALF_PLATE_Z must equal HALF_Z + CLAD_EXT"
 
 # =============================================================================
 # AXIAL MODEL EXTENTS AND FIXED-LENGTH BLADE PARAMETERS
@@ -131,24 +169,53 @@ ROD_TRAVEL       = 60.0    # cm — full stroke
 CORE_TOP         = +90.0   # cm — vacuum boundary; COINCIDES with the fully-withdrawn
                             # (f=1) blade top (z_top = -30 + 60 + 60 = +90). No cap above.
 CORE_BOTTOM      = -90.0   # cm — vacuum boundary; symmetric with CORE_TOP
-                            # (15 cm end-box + 45 cm water below -30)
-ENDBOX_ABOVE_TOP = +45.0   # cm — top of upper end-box  (+30 + 15 cm)
-ENDBOX_BELOW_BOT = -45.0   # cm — bottom of lower end-box (-30 - 15 cm)
 
-# Symmetry / height tripwires — deck-confirmed axial stack. Documentation +
-# guard only: none of these feed a cell or surface directly.
-assert CORE_TOP == -CORE_BOTTOM, "axial model must be symmetric about z=0"
-assert (CORE_TOP - CORE_BOTTOM) == 180.0, "total axial height must be 180 cm"
-assert (CORE_TOP - ENDBOX_ABOVE_TOP) == 45.0, "upper water region must be 45 cm"
-assert (ENDBOX_BELOW_BOT - CORE_BOTTOM) == 45.0, "lower water region must be 45 cm"
-assert (ENDBOX_ABOVE_TOP - HALF_Z) == 15.0, "upper end-box must be 15 cm"
-assert (-HALF_Z - ENDBOX_BELOW_BOT) == 15.0, "lower end-box must be 15 cm"
+# Homogenized end-box axial extent. The plates gaining 1 cm at each end and the
+# end-box losing 1 cm are the same centimetre — +/-45 and +/-90 do not move.
+ENDBOX_HEIGHT    = 14.0    # cm — homogenized end-box height            [MCNP]
+
+ENDBOX_ABOVE_TOP = HALF_PLATE_Z + ENDBOX_HEIGHT    # +45.0 cm           [DERIVED]
+ENDBOX_BELOW_BOT = -ENDBOX_ABOVE_TOP               # −45.0 cm           [DERIVED]
+POOL_WATER_AXIAL = CORE_TOP - ENDBOX_ABOVE_TOP     # +45.0 cm           [DERIVED]
+
+# Symmetry / height tripwires. Documentation + guard only: none of these feed a
+# cell or surface directly. Tolerance-based, not ==, since every value here is
+# now the end of a float derivation chain.
+assert abs(CORE_TOP + CORE_BOTTOM) < 1e-12, "axial model must be symmetric about z=0"
+assert abs((CORE_TOP - CORE_BOTTOM) - 180.0) < 1e-12, "total axial height must be 180 cm"
+assert abs((CORE_TOP - ENDBOX_ABOVE_TOP) - POOL_WATER_AXIAL) < 1e-12, \
+    "upper water region must be POOL_WATER_AXIAL"
+assert abs((ENDBOX_BELOW_BOT - CORE_BOTTOM) - POOL_WATER_AXIAL) < 1e-12, \
+    "lower water region must be POOL_WATER_AXIAL"
+assert abs((ENDBOX_ABOVE_TOP - HALF_PLATE_Z) - ENDBOX_HEIGHT) < 1e-12, \
+    "upper end-box must be ENDBOX_HEIGHT tall"
+assert abs((-HALF_PLATE_Z - ENDBOX_BELOW_BOT) - ENDBOX_HEIGHT) < 1e-12, \
+    "lower end-box must be ENDBOX_HEIGHT tall"
+
+# B1 tripwire — the whole axial stack, layer by layer, must close on 180 cm:
+#   2 * (45 water + 14 end-box + 1 clad extension + 30 half-meat) = 180
+_AXIAL_STACK_SUM = 2.0 * (POOL_WATER_AXIAL + ENDBOX_HEIGHT + CLAD_EXT + HALF_Z)
+assert abs(_AXIAL_STACK_SUM - 180.0) < 1e-12, (
+    f"axial stack sums to {_AXIAL_STACK_SUM} cm, not 180 cm — layers: "
+    f"water {POOL_WATER_AXIAL}, end-box {ENDBOX_HEIGHT}, clad ext {CLAD_EXT}, "
+    f"half-meat {HALF_Z}")
+assert abs(_AXIAL_STACK_SUM - (CORE_TOP - CORE_BOTTOM)) < 1e-12, \
+    "axial layer sum disagrees with the CORE_BOTTOM..CORE_TOP model extent"
+
+# Blade travel is unchanged by B1: the f=1 blade top must still land exactly on
+# CORE_TOP, which is what makes the withdrawn case create no cap at all.
+assert abs((-HALF_Z + ROD_TRAVEL + BLADE_LENGTH) - CORE_TOP) < 1e-12, \
+    "f=1 blade top no longer coincides with CORE_TOP — cap logic assumes it does"
 
 # Shared axial ZPlane surfaces — transmission (NOT vacuum boundaries).
 # Defined once at module level and reused in every element universe to avoid
 # creating redundant surfaces at identical z-values.
+# _z_fuel_* bound the ACTIVE MEAT (+/-30); _z_plate_* bound the PLATES and every
+# structural cell (+/-31). The 1 cm between them is unfueled cladding.
 _z_fuel_bot     = openmc.ZPlane(z0=-HALF_Z)           # −30.0 cm
 _z_fuel_top     = openmc.ZPlane(z0= HALF_Z)           # +30.0 cm
+_z_plate_bot    = openmc.ZPlane(z0=-HALF_PLATE_Z)     # −31.0 cm
+_z_plate_top    = openmc.ZPlane(z0= HALF_PLATE_Z)     # +31.0 cm
 _z_endbox_above = openmc.ZPlane(z0=ENDBOX_ABOVE_TOP)  # +45.0 cm
 _z_endbox_below = openmc.ZPlane(z0=ENDBOX_BELOW_BOT)  # −45.0 cm
 _z_model_top    = openmc.ZPlane(z0=CORE_TOP)           # +90.0 cm
@@ -165,9 +232,9 @@ _z_model_bot    = openmc.ZPlane(z0=CORE_BOTTOM)        # −90.0 cm
 #
 # The zone bounds are derived from the ACTIVE MEAT planes themselves (reading
 # .z0 off the existing shared surfaces), NOT from ELEM_Z. ELEM_Z is the element
-# extent; if the two ever diverge, zones derived from ELEM_Z would silently
-# fail to tile the meat. The tiling assert below tests the quantity that
-# actually matters.
+# extent, and since B1 the two HAVE diverged (62 cm element vs 60 cm meat);
+# zones derived from ELEM_Z would tile 62 cm and silently mis-size every
+# depletion volume. The tiling assert below tests the quantity that matters.
 #
 # Zoning is opt-in (build_core_geometry(depletion_zoning=True)). With it off,
 # none of these surfaces are created and the model is unchanged.
@@ -175,7 +242,14 @@ _z_model_bot    = openmc.ZPlane(z0=CORE_BOTTOM)        # −90.0 cm
 
 MEAT_BOT_Z  = _z_fuel_bot.z0     # −30.0 cm — active meat lower bound
 MEAT_TOP_Z  = _z_fuel_top.z0     # +30.0 cm — active meat upper bound
-MEAT_HEIGHT = MEAT_TOP_Z - MEAT_BOT_Z                       # 60.0 cm
+
+# MEAT_HEIGHT is a module-level primary (see the envelope block); it used to be
+# derived here off these two planes. Since B1 the plates (62 cm) and the meat
+# (60 cm) are different heights, so the derivation is inverted into a check:
+# the meat planes must still bound exactly MEAT_HEIGHT, or the zone tiling
+# below is sizing depletion volumes against the wrong stack.
+assert abs((MEAT_TOP_Z - MEAT_BOT_Z) - MEAT_HEIGHT) < 1e-12, \
+    "active meat planes do not bound MEAT_HEIGHT"
 
 MEAT_ZONE_HEIGHT           = MEAT_HEIGHT / N_AXIAL_ZONES    # 12.0 cm for N=5
 MEAT_ZONE_VOLUME_PER_PLATE = MEAT_THICK * MEAT_WIDTH * MEAT_ZONE_HEIGHT
@@ -219,8 +293,9 @@ def zone_z_bounds(k):
 
 # =============================================================================
 # STANDARD FUEL ELEMENT
-# 23 plates stacked in y, running in x. Plate meat is 60 cm tall (z).
-# All structural cells are bounded to the active zone z=[-30, +30].
+# 23 plates stacked in y, running in x. Plates are 62 cm tall (z) with 60 cm
+# of meat inside them. All structural cells are bounded to the plate height
+# z=[-31, +31]; only the meat stops at z=[-30, +30].
 # End-box and water regions fill the full pitch footprint above/below.
 # =============================================================================
 
@@ -230,7 +305,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
 
     X = plate meat width direction (side plates bound this)
     Y = plate/channel stack direction (plates stacked here)
-    Z = axial (active fuel from -30 to +30 cm)
+    Z = axial (plates -31 to +31 cm; active fuel meat -30 to +30 cm)
 
     elem_id     integer index, unchanged — drives every cell name.
     element_id  core-map position label ('B4', ...) — depletion zoning only.
@@ -267,10 +342,14 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
     meat_left  = openmc.XPlane(x0=-MEAT_WIDTH / 2.0)
     meat_right = openmc.XPlane(x0= MEAT_WIDTH / 2.0)
 
-    # Axial bounds — reuse module-level surfaces (avoids redundant surface IDs)
+    # Axial bounds — reuse module-level surfaces (avoids redundant surface IDs).
+    # meat_z* bound the fuel meat only (+/-30); plate_z bounds the plates and
+    # every structural cell (+/-31). The clad cells subtract the full meat
+    # region, so the 1 cm bands [+/-30, +/-31] inside the meat footprint come
+    # out as unfueled cladding with no extra cell.
     meat_zbot = _z_fuel_bot   # −30 cm
     meat_ztop = _z_fuel_top   # +30 cm
-    active_z  = +_z_fuel_bot & -_z_fuel_top
+    plate_z   = +_z_plate_bot & -_z_plate_top   # [−31, +31]
 
     cells = []
 
@@ -314,7 +393,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
         plate_region = (
             +side_inner_left & -side_inner_right &
             +plate_bottom & -plate_top &
-            active_z
+            plate_z
         )
 
         if zoned:
@@ -351,7 +430,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
                 region=(
                     +side_inner_left & -side_inner_right &
                     +chan_bottom & -chan_top &
-                    active_z
+                    plate_z
                 )
             ))
             y += WATER_CHAN_THICK
@@ -365,7 +444,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
         region=(
             +box_front & -stack_bottom_surf &
             +side_inner_left & -side_inner_right &
-            active_z
+            plate_z
         )
     ))
     cells.append(openmc.Cell(
@@ -374,7 +453,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
         region=(
             +stack_top_surf & -box_back &
             +side_inner_left & -side_inner_right &
-            active_z
+            plate_z
         )
     ))
 
@@ -385,7 +464,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
         region=(
             +box_left & -side_inner_left &
             +box_front & -box_back &
-            active_z
+            plate_z
         )
     ))
     cells.append(openmc.Cell(
@@ -394,7 +473,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
         region=(
             +side_inner_right & -box_right &
             +box_front & -box_back &
-            active_z
+            plate_z
         )
     ))
 
@@ -405,7 +484,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
         region=(
             +pitch_left & -box_left &
             +pitch_front & -pitch_back &
-            active_z
+            plate_z
         )
     ))
     cells.append(openmc.Cell(
@@ -414,7 +493,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
         region=(
             +box_right & -pitch_right &
             +pitch_front & -pitch_back &
-            active_z
+            plate_z
         )
     ))
     cells.append(openmc.Cell(
@@ -423,7 +502,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
         region=(
             +box_left & -box_right &
             +pitch_front & -box_front &
-            active_z
+            plate_z
         )
     ))
     cells.append(openmc.Cell(
@@ -432,7 +511,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
         region=(
             +box_left & -box_right &
             +box_back & -pitch_back &
-            active_z
+            plate_z
         )
     ))
 
@@ -445,7 +524,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
     cells.append(openmc.Cell(
         name=f'std{elem_id}_upper_endbox',
         fill=end_box_homog,
-        region=full_pitch & +_z_fuel_top & -_z_endbox_above
+        region=full_pitch & +_z_plate_top & -_z_endbox_above   # +31 → +45 cm
     ))
     cells.append(openmc.Cell(
         name=f'std{elem_id}_upper_water',
@@ -455,7 +534,7 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
     cells.append(openmc.Cell(
         name=f'std{elem_id}_lower_endbox',
         fill=end_box_homog,
-        region=full_pitch & +_z_endbox_below & -_z_fuel_bot
+        region=full_pitch & +_z_endbox_below & -_z_plate_bot   # −45 → −31 cm
     ))
     cells.append(openmc.Cell(
         name=f'std{elem_id}_lower_water',
@@ -491,14 +570,15 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
 #   The B4C absorber blade is BLADE_LENGTH=60 cm long and translates in z.
 #   At fraction f, the blade occupies z=[z_bot, z_top] = [-30+f*60, +30+f*60].
 #   b4c fills the Hf-slot x/y band for z in [z_bot, z_top] across the full
-#   model height. Below z_bot, water fills the slot (active zone only — the
-#   blade never dips below z=-30, so the lower end-box/water are uniform
-#   material with no reserved slot at all). Above z_top, the slot's own
-#   material is region-appropriate (homo in [+30,+45], water in
-#   [+45, CORE_TOP]) rather than a permanently reserved water channel; at
-#   f=1, z_top == CORE_TOP so that complement is zero-measure (no cap).
-#   All guide/slider/fuel/channel cells are bounded to the active zone
-#   z=[-30, +30]; end-box/water cells fill z outside that range.
+#   model height. Below z_bot, water fills the slot down to the plate bottom
+#   (-31) — the blade never dips below z=-30, so the lower end-box/water are
+#   uniform material with no reserved slot at all. Above z_top, the slot's own
+#   material is region-appropriate (coolant up to +31 if the blade is below
+#   it, then the 14 cm cap, then water to CORE_TOP); at f=1, z_top == CORE_TOP
+#   so that complement is zero-measure (no cap).
+#   All guide/slider/fuel/channel cells are bounded to the PLATE height
+#   z=[-31, +31]; only the fuel meat stops at z=[-30, +30]; end-box/water cells
+#   fill z outside [-31, +31].
 # =============================================================================
 
 ABSORBER_THICK  = 0.31
@@ -557,7 +637,7 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     translates in z.
 
     withdrawn_fraction f in [0, 1]:
-        f=0 → blade at z=[-30, +30] (all-in, blade fully within active fuel)
+        f=0 → blade at z=[-30, +30] (all-in, blade spans the active meat)
         f=1 → blade at z=[+30, +90] (all-out, blade entirely above active fuel)
 
     The blade always exists; only its z-position changes.
@@ -604,7 +684,7 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     # Axial surfaces for this blade position
     blade_z_bot = openmc.ZPlane(z0=z_bot)
     blade_z_top = openmc.ZPlane(z0=z_top)
-    active_z    = +_z_fuel_bot & -_z_fuel_top
+    plate_z    = +_z_plate_bot & -_z_plate_top   # [−31, +31]
 
     cells = []
 
@@ -669,29 +749,30 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_offset_water_bottom', fill=water_core,
         region=(+elem_front & -bot_offset_top &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_guide_bottom', fill=aluminum,
         region=(+bot_offset_top & -bot_guide_top &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_blade_water_outer_bottom', fill=water_core,
         region=(+bot_guide_top & -bot_hf_bot &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
 
-    # (Hf slot cells are handled separately below — not bounded to active_z)
+    # (Hf slot cells are handled separately below — not bounded to plate_z)
+    #  they own their own z-ranges, driven by the blade position.
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_blade_water_inner_bottom', fill=water_core,
         region=(+bot_hf_top & -bot_slider_bot &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_slider_bottom', fill=aluminum,
         region=(+bot_slider_bot & -bot_slider_top &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
 
     # ── Top sandwich structural cells (active zone only) ────────────────────
     # Fuel -> wall: feeder channel | inner guide | blade water | [blade] |
@@ -700,27 +781,27 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_slider_top', fill=aluminum,
         region=(+top_slider_bot & -top_slider_top &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_blade_water_inner_top', fill=water_core,
         region=(+top_slider_top & -top_hf_bot &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_blade_water_outer_top', fill=water_core,
         region=(+top_hf_top & -top_guide_bot &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_guide_top', fill=aluminum,
         region=(+top_guide_bot & -top_guide_top &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_offset_water_top', fill=water_core,
         region=(+top_guide_top & -elem_back &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
 
     # ── Fixed-length B4C blade ───────────────────────────────────────────────
     # B4C occupies [z_bot, z_top] in the Hf-slot band, unbounded by axial
@@ -732,40 +813,65 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
         name=f'ctrl{elem_id}_absorber_top', fill=b4c,
         region=hf_slot_t & +blade_z_bot & -blade_z_top))
 
-    # Water gap below the blade, ACTIVE ZONE ONLY (blade withdrawing vacates
-    # the bottom of the active zone; blade_z_bot in [-30,+30] per the assert
-    # above). There is never a gap above the blade inside the active zone,
-    # since blade_z_top is always >= HALF_Z (asserted above).
+    # Water below the blade, down to the BOTTOM OF THE PLATES (−31), not the
+    # bottom of the meat. The lower end-box now stops at −31 and carries no
+    # slot exclusion, so if this stopped at −30 the slot band [−31, −30] would
+    # be undefined space: it passes an overlap check and leaks particles.
+    # The blade never dips below −30 (asserted above), so this band is always
+    # water regardless of f.
     cells.append(openmc.Cell(
-        name=f'ctrl{elem_id}_slot_b_water_active', fill=water_core,
-        region=hf_slot_b & +_z_fuel_bot & -blade_z_bot))
+        name=f'ctrl{elem_id}_slot_b_water_below', fill=water_core,
+        region=hf_slot_b & +_z_plate_bot & -blade_z_bot))
     cells.append(openmc.Cell(
-        name=f'ctrl{elem_id}_slot_t_water_active', fill=water_core,
-        region=hf_slot_t & +_z_fuel_bot & -blade_z_bot))
+        name=f'ctrl{elem_id}_slot_t_water_below', fill=water_core,
+        region=hf_slot_t & +_z_plate_bot & -blade_z_bot))
 
-    # Moving homogenized end-box cap, rigidly attached to the blade top. A
-    # 15 cm end_box_homog cap rides on top of the blade in the Hf-slot x/y
-    # band, translating with it and clipped at CORE_TOP; above the cap the slot
-    # is water (294 K) up to CORE_TOP. At f=0 the cap occupies [+30,+45],
-    # coplanar with the surrounding end-boxes. At f=1 the blade top coincides
-    # with CORE_TOP, so the cap is pushed entirely out of the model and is not
-    # created at all — the blade fills the slot to the top.
+    # ── Moving homogenized end-box cap (A4, resolved 2026-07-31: Option B) ──
+    # An ENDBOX_HEIGHT (14 cm) end_box_homog cap rides above the blade in the
+    # Hf-slot x/y band, clipped at CORE_TOP; above the cap the slot is water
+    # (294 K) up to CORE_TOP.
+    #
+    # The cap bottom is max(z_top, HALF_PLATE_Z), NOT z_top. B1 shortened the
+    # cap from 15 cm to 14 cm while the plates grew to +/-31, so a cap bolted
+    # rigidly to the blade top would sit at [+30,+44] at f=0 — 1 cm low, and no
+    # longer coplanar with the surrounding end-boxes at [+31,+45]. The
+    # 2026-07-20 decision is that the cap IS coplanar at full insertion, so the
+    # cap is anchored to the fixed end-box floor instead and the 1 cm slot band
+    # [z_top, +31] is core coolant water.
+    #
+    # This only bites for z_top < HALF_PLATE_Z, i.e. f < CLAD_EXT/ROD_TRAVEL
+    # (1/60 ~ 0.0167). At and above that the cap sits on the blade top exactly
+    # as it always did, and the water band is zero-measure.
+    #
     # No lower-side counterpart is needed: blade_z_bot is always >= -HALF_Z
     # (asserted above), so the blade never reaches the lower end-box/water.
     if z_top < CORE_TOP:
-        # Cap top is always >= +45 (z_top >= HALF_Z = +30, asserted above), so
-        # the water above the cap never encroaches on the end-box band
-        # [+30,+45].
-        assert z_top + 15.0 >= ENDBOX_ABOVE_TOP, (
-            f"ctrl{elem_id}: cap top {z_top + 15.0:.2f} < ENDBOX_ABOVE_TOP "
-            f"{ENDBOX_ABOVE_TOP} — cap would not clear the end-box band")
-        blade_cap_top = openmc.ZPlane(z0=min(z_top + 15.0, CORE_TOP))
+        cap_bot_z = max(z_top, HALF_PLATE_Z)
+        # Cap top is always >= ENDBOX_ABOVE_TOP, so the water above the cap
+        # never encroaches on the end-box band [+31,+45].
+        assert cap_bot_z + ENDBOX_HEIGHT >= ENDBOX_ABOVE_TOP, (
+            f"ctrl{elem_id}: cap top {cap_bot_z + ENDBOX_HEIGHT:.2f} < "
+            f"ENDBOX_ABOVE_TOP {ENDBOX_ABOVE_TOP} — cap would not clear the "
+            f"end-box band")
+        blade_cap_bot = openmc.ZPlane(z0=cap_bot_z)
+        blade_cap_top = openmc.ZPlane(z0=min(cap_bot_z + ENDBOX_HEIGHT, CORE_TOP))
+
+        # Coolant in the slot between the blade top and the cap floor. Empty
+        # (zero-measure) whenever the blade has been withdrawn past +31.
+        if cap_bot_z > z_top:
+            cells.append(openmc.Cell(
+                name=f'ctrl{elem_id}_slot_b_water_under_cap', fill=water_core,
+                region=hf_slot_b & +blade_z_top & -blade_cap_bot))
+            cells.append(openmc.Cell(
+                name=f'ctrl{elem_id}_slot_t_water_under_cap', fill=water_core,
+                region=hf_slot_t & +blade_z_top & -blade_cap_bot))
+
         cells.append(openmc.Cell(
             name=f'ctrl{elem_id}_blade_cap_slot_b', fill=end_box_homog,
-            region=hf_slot_b & +blade_z_top & -blade_cap_top))
+            region=hf_slot_b & +blade_cap_bot & -blade_cap_top))
         cells.append(openmc.Cell(
             name=f'ctrl{elem_id}_blade_cap_slot_t', fill=end_box_homog,
-            region=hf_slot_t & +blade_z_top & -blade_cap_top))
+            region=hf_slot_t & +blade_cap_bot & -blade_cap_top))
         if blade_cap_top.z0 < CORE_TOP:
             cells.append(openmc.Cell(
                 name=f'ctrl{elem_id}_water_above_cap_slot_b', fill=water,
@@ -800,7 +906,7 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
         clad_region = (
             +plate_bot_s & -plate_top_s &
             +side_inner_left & -side_inner_right &
-            active_z &
+            plate_z &
             ~meat_region
         )
         if zoned:
@@ -823,44 +929,44 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_chan_bot_half', fill=water_core,
         region=(+bot_slider_top & -plate_bot_surfs[0] &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
     for i in range(N_CTRL_FUEL_PLATES - 1):
         cells.append(openmc.Cell(
             name=f'ctrl{elem_id}_chan_{i}', fill=water_core,
             region=(+plate_top_surfs[i] & -plate_bot_surfs[i + 1] &
-                    +side_inner_left & -side_inner_right & active_z)))
+                    +side_inner_left & -side_inner_right & plate_z)))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_chan_top_half', fill=water_core,
         region=(+plate_top_surfs[-1] & -top_slider_bot &
-                +side_inner_left & -side_inner_right & active_z)))
+                +side_inner_left & -side_inner_right & plate_z)))
 
     # Side plates (active zone only)
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_side_left', fill=aluminum,
         region=(+elem_left & -side_inner_left &
-                +elem_front & -elem_back & active_z)))
+                +elem_front & -elem_back & plate_z)))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_side_right', fill=aluminum,
         region=(+side_inner_right & -elem_right &
-                +elem_front & -elem_back & active_z)))
+                +elem_front & -elem_back & plate_z)))
 
     # Inter-element water gaps (active zone only)
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_gap_xleft', fill=water_core,
         region=(+pitch_left & -elem_left &
-                +pitch_front & -pitch_back & active_z)))
+                +pitch_front & -pitch_back & plate_z)))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_gap_xright', fill=water_core,
         region=(+elem_right & -pitch_right &
-                +pitch_front & -pitch_back & active_z)))
+                +pitch_front & -pitch_back & plate_z)))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_gap_yfront', fill=water_core,
         region=(+elem_left & -elem_right &
-                +pitch_front & -elem_front & active_z)))
+                +pitch_front & -elem_front & plate_z)))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_gap_yback', fill=water_core,
         region=(+elem_left & -elem_right &
-                +elem_back & -pitch_back & active_z)))
+                +elem_back & -pitch_back & plate_z)))
 
     # ── Axial regions above/below active fuel ───────────────────────────────
     # Upper end-box/water still exclude the Hf-slot footprint (handled above,
@@ -875,13 +981,13 @@ def make_control_fuel_element(elem_id, withdrawn_fraction=0.0,
 
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_upper_endbox', fill=end_box_homog,
-        region=full_pitch & +_z_fuel_top & -_z_endbox_above & not_hf_slots))
+        region=full_pitch & +_z_plate_top & -_z_endbox_above & not_hf_slots))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_upper_water', fill=water,
         region=full_pitch & +_z_endbox_above & -_z_model_top & not_hf_slots))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_lower_endbox', fill=end_box_homog,
-        region=full_pitch & +_z_endbox_below & -_z_fuel_bot))
+        region=full_pitch & +_z_endbox_below & -_z_plate_bot))
     cells.append(openmc.Cell(
         name=f'ctrl{elem_id}_lower_water', fill=water,
         region=full_pitch & +_z_model_bot & -_z_endbox_below))
@@ -906,7 +1012,7 @@ def make_flux_trap():
     and below is likewise one solid full-pitch block — no gap subdivision.
 
     Cylinder: radius FT_HOLE_RADIUS = 2.5 cm, centered at element origin (x=0, y=0).
-    The cylinder is axially unbounded within the active zone (active_z clips it).
+    The cylinder is axially unbounded within the plate height (plate_z clips it).
     Aluminum fills the annular region between the cylinder and the pitch envelope.
     """
     pitch_left  = openmc.XPlane(x0=-PITCH_X / 2.0)
@@ -921,7 +1027,7 @@ def make_flux_trap():
 
     hole_cyl = openmc.ZCylinder(x0=0.0, y0=0.0, r=FT_HOLE_RADIUS)
 
-    active_z = +_z_fuel_bot & -_z_fuel_top
+    plate_z = +_z_plate_bot & -_z_plate_top   # [−31, +31]
 
     cells = []
 
@@ -929,13 +1035,13 @@ def make_flux_trap():
     cells.append(openmc.Cell(
         name='flux_trap_water_hole',
         fill=water_core,
-        region=-hole_cyl & active_z
+        region=-hole_cyl & plate_z
     ))
     # Aluminum block: full pitch envelope minus the cylinder, active zone only
     cells.append(openmc.Cell(
         name='flux_trap_aluminum_block',
         fill=aluminum,
-        region=(+pitch_left & -pitch_right & +pitch_front & -pitch_back & +hole_cyl & active_z)
+        region=(+pitch_left & -pitch_right & +pitch_front & -pitch_back & +hole_cyl & plate_z)
     ))
 
     # Axial regions above/below active fuel. End-box is one solid full-pitch
@@ -948,7 +1054,7 @@ def make_flux_trap():
     cells.append(openmc.Cell(
         name='flux_trap_upper_endbox',
         fill=end_box_homog,
-        region=full_pitch & +_z_fuel_top & -_z_endbox_above
+        region=full_pitch & +_z_plate_top & -_z_endbox_above
     ))
     cells.append(openmc.Cell(
         name='flux_trap_upper_water',
@@ -958,7 +1064,7 @@ def make_flux_trap():
     cells.append(openmc.Cell(
         name='flux_trap_lower_endbox',
         fill=end_box_homog,
-        region=full_pitch & +_z_endbox_below & -_z_fuel_bot
+        region=full_pitch & +_z_endbox_below & -_z_plate_bot
     ))
     cells.append(openmc.Cell(
         name='flux_trap_lower_water',
@@ -985,7 +1091,7 @@ water_univ = openmc.Universe(name='water_universe', cells=[water_cell])
 # (no inter-element water gaps), so adjacent reflector positions form one
 # continuous graphite wall.
 #
-# Axially: graphite occupies only the active fuel z-range [-30, +30]. Above
+# Axially: graphite occupies the full block z-range [-31, +31]. Above
 # and below, the end-box (homogenized water/Al) region is one solid
 # full-pitch block, same as the fuel elements — no gap subdivision.
 # Water-beyond stays full pitch, mirroring the fuel element end-box + water
@@ -1001,7 +1107,7 @@ def make_graphite_element():
     pitch_front = openmc.YPlane(y0=-PITCH_Y / 2.0)
     pitch_back  = openmc.YPlane(y0= PITCH_Y / 2.0)
 
-    active_z   = +_z_fuel_bot & -_z_fuel_top
+    plate_z    = +_z_plate_bot & -_z_plate_top   # [−31, +31]
     full_pitch = +pitch_left & -pitch_right & +pitch_front & -pitch_back
 
     # End-box is one solid full-pitch homogenized block — no inter-element
@@ -1011,12 +1117,12 @@ def make_graphite_element():
         openmc.Cell(
             name='graphite_block',
             fill=graphite,
-            region=active_z,
+            region=plate_z,
         ),
         openmc.Cell(
             name='graphite_upper_endbox',
             fill=end_box_homog,
-            region=full_pitch & +_z_fuel_top & -_z_endbox_above,   # +30 → +45 cm
+            region=full_pitch & +_z_plate_top & -_z_endbox_above,  # +31 → +45 cm
         ),
         openmc.Cell(
             name='graphite_upper_water',
@@ -1026,7 +1132,7 @@ def make_graphite_element():
         openmc.Cell(
             name='graphite_lower_endbox',
             fill=end_box_homog,
-            region=full_pitch & +_z_endbox_below & -_z_fuel_bot,   # −45 → −30 cm
+            region=full_pitch & +_z_endbox_below & -_z_plate_bot,  # −45 → −31 cm
         ),
         openmc.Cell(
             name='graphite_lower_water',
@@ -1213,15 +1319,149 @@ def build_core_geometry(withdrawn_fraction=1.0, depletion_zoning=False):
 geometry = build_core_geometry(withdrawn_fraction=0.0)
 
 
+def _lattice_center(row, col):
+    """Global (x, y) of the centre of CORE_MAP cell (row, col).
+
+    Mirrors the lattice lower_left used in build_core_geometry(); row 0 is the
+    +y edge, matching CORE_MAP's array order.
+    """
+    n_rows = len(CORE_MAP)
+    ll_x, ll_y = -4 * PITCH_X, -4.5 * PITCH_Y
+    return (ll_x + (col + 0.5) * PITCH_X,
+            ll_y + (n_rows - 1 - row + 0.5) * PITCH_Y)
+
+
+def _material_at(geom, x, y, z):
+    """Name of the material filling the innermost cell containing (x, y, z)."""
+    for obj in reversed(geom.find((x, y, z))):
+        if isinstance(obj, openmc.Cell):
+            if obj.fill is None:
+                return None
+            return getattr(obj.fill, 'name', None)
+    return None
+
+
+def _run_point_checks(geom, f):
+    """Point-containment assertions for the B1 axial stack.
+
+    Probes a standard element's first-plate meat centreline up the axial stack:
+    meat -> unfueled clad extension -> end-box -> water. Any of these coming
+    back as the wrong material (or None) means a band is mis-clipped or has
+    been left as undefined space.
+    """
+    row, col = 2, 1                          # CORE_MAP 'S' position A2
+    assert CORE_MAP[row][col] == 'S', "point-check anchor is not a standard element"
+    ex, ey = _lattice_center(row, col)
+
+    # Centreline of plate 0's meat, derived exactly as the builder lays it out.
+    meat0_y = -(STD_STACK_HEIGHT / 2.0) + CLAD_THICK_OUTER + MEAT_THICK / 2.0
+    px, py = ex, ey + meat0_y
+
+    z_mid_clad_ext = HALF_Z + CLAD_EXT / 2.0            # +30.5
+    z_mid_endbox   = HALF_PLATE_Z + ENDBOX_HEIGHT / 2.0  # +38.0
+    z_mid_water    = ENDBOX_ABOVE_TOP + POOL_WATER_AXIAL / 2.0  # +67.5
+
+    # Exact material identity, not substrings: the clad extension band must be
+    # cladding and nothing else, which is the entire point of B1.
+    expected = [
+        (( px,  py,            0.0), fuel,          'active meat'),
+        (( px,  py,  z_mid_clad_ext), clad,         'upper clad extension'),
+        (( px,  py, -z_mid_clad_ext), clad,         'lower clad extension'),
+        (( px,  py,  z_mid_endbox), end_box_homog,  'upper end-box'),
+        (( px,  py, -z_mid_endbox), end_box_homog,  'lower end-box'),
+        (( px,  py,  z_mid_water),  water,          'upper water'),
+        (( px,  py, -z_mid_water),  water,          'lower water'),
+    ]
+    for point, want, label in expected:
+        got = _material_at(geom, *point)
+        assert got is not None, \
+            f"f={f}: {label} at {point} is UNDEFINED SPACE (no material)"
+        assert got == want.name, \
+            f"f={f}: {label} at {point} is '{got}', expected '{want.name}'"
+
+    print(f"  point checks (f={f}): axial stack "
+          f"meat/clad-ext/end-box/water all resolve correctly")
+
+
+def _run_blade_slot_checks(geom, f):
+    """Point-containment assertions down a control element's absorber slot.
+
+    This is the A4 (Option B) check. At full insertion the blade top is at +30
+    but the end-box floor is at +31, so the slot must read:
+        blade -> 1 cm coolant -> 14 cm cap (coplanar at [+31,+45]) -> water.
+    Once the blade is withdrawn past +31 the coolant band closes up and the cap
+    sits directly on the blade top again.
+    """
+    row, col = 2, 3                          # CORE_MAP 'C' position D2
+    assert CORE_MAP[row][col] == 'C', "slot-check anchor is not a control element"
+    ex, ey = _lattice_center(row, col)
+
+    # Centreline of the lower absorber slot, built outward exactly as the
+    # element builder lays the end block out.
+    slot_c = -(CTRL_FUEL_STACK_HALF + CTRL_FEEDER_CHANNEL + CTRL_AL_PLATE_THICK
+               + CTRL_BLADE_WATER + ABSORBER_THICK / 2.0)
+    px, py = ex, ey + slot_c
+
+    z_bot = -HALF_Z + f * ROD_TRAVEL
+    z_top = z_bot + BLADE_LENGTH
+
+    def want_at(z):
+        """Material the slot should carry at height z, per the A4 resolution."""
+        if z < z_bot:
+            return water_core          # slot below the blade, down to −31
+        if z < z_top:
+            return b4c                 # the blade itself
+        if z >= CORE_TOP:
+            return None
+        cap_bot = max(z_top, HALF_PLATE_Z)
+        if z < cap_bot:
+            return water_core          # A4: coolant between blade top and cap
+        if z < min(cap_bot + ENDBOX_HEIGHT, CORE_TOP):
+            return end_box_homog       # the 14 cm cap
+        return water                   # bulk water above the cap
+
+    probes = [-31.0 + CLAD_EXT / 2.0, -HALF_Z / 2.0, 0.0, HALF_Z / 2.0,
+              HALF_Z + CLAD_EXT / 2.0, HALF_PLATE_Z + ENDBOX_HEIGHT / 2.0,
+              ENDBOX_ABOVE_TOP - 0.5, ENDBOX_ABOVE_TOP + 0.5, 67.5, 89.5]
+    for z in probes:
+        want = want_at(z)
+        if want is None:
+            continue
+        got = _material_at(geom, px, py, z)
+        assert got is not None, \
+            f"f={f}: absorber slot at z={z} is UNDEFINED SPACE (no material)"
+        assert got == want.name, \
+            f"f={f}: absorber slot at z={z} is '{got}', expected '{want.name}'"
+
+    # A4 explicitly: at full insertion the cap must be coplanar with the
+    # surrounding end-boxes, and the 1 cm band below it must be coolant.
+    if f == 0.0:
+        assert _material_at(geom, px, py, HALF_Z + CLAD_EXT / 2.0) == water_core.name, \
+            "A4: slot band [+30,+31] at f=0 must be core coolant water"
+        assert _material_at(geom, px, py, ENDBOX_ABOVE_TOP - 0.5) == end_box_homog.name, \
+            "A4: cap must reach ENDBOX_ABOVE_TOP at f=0 (coplanar with end-boxes)"
+        assert _material_at(geom, px, py, ENDBOX_ABOVE_TOP + 0.5) == water.name, \
+            "A4: cap must stop at ENDBOX_ABOVE_TOP at f=0, water above"
+
+    print(f"  slot checks  (f={f}): absorber slot stack resolves correctly "
+          f"(blade z=[{z_bot:.1f}, {z_top:.1f}])")
+
+
 if __name__ == '__main__':
     geometry.export_to_xml()
     print("geometry.xml written successfully.\n")
     print(f"Lattice pitch:        {PITCH_X} x {PITCH_Y} cm")
     print(f"Element envelope:     {ELEM_X} x {ELEM_Y} x {ELEM_Z} cm")
-    print(f"Active fuel z:        [{-HALF_Z}, {+HALF_Z}] cm")
-    print(f"End-box above:        [{+HALF_Z}, {ENDBOX_ABOVE_TOP}] cm")
-    print(f"End-box below:        [{ENDBOX_BELOW_BOT}, {-HALF_Z}] cm")
+    print(f"Active fuel meat z:   [{-HALF_Z}, {+HALF_Z}] cm ({MEAT_HEIGHT} cm)")
+    print(f"Plate / clad z:       [{-HALF_PLATE_Z}, {+HALF_PLATE_Z}] cm "
+          f"({PLATE_HEIGHT} cm, {CLAD_EXT} cm unfueled clad each end)")
+    print(f"End-box above:        [{+HALF_PLATE_Z}, {ENDBOX_ABOVE_TOP}] cm "
+          f"({ENDBOX_HEIGHT} cm)")
+    print(f"End-box below:        [{ENDBOX_BELOW_BOT}, {-HALF_PLATE_Z}] cm "
+          f"({ENDBOX_HEIGHT} cm)")
     print(f"Core z-bounds:        [{CORE_BOTTOM}, {CORE_TOP}] cm (vacuum)")
+    print(f"Axial stack sum:      2 x ({POOL_WATER_AXIAL} + {ENDBOX_HEIGHT} + "
+          f"{CLAD_EXT} + {HALF_Z}) = {_AXIAL_STACK_SUM} cm")
     print(f"Active-zone gap width: GAP_X={GAP_X:.4f} cm, GAP_Y={GAP_Y:.4f} cm "
           f"(end-box regions are solid full-pitch homogenized blocks — no "
           f"gap subdivision there)")
@@ -1277,6 +1517,20 @@ if __name__ == '__main__':
     with tempfile.TemporaryDirectory() as _debug_dir:
         debug_model.run(geometry_debug=True, cwd=_debug_dir)
     print("\nOverlap check (f=0.0) passed: no cell overlaps detected.")
+    _run_point_checks(geometry, 0.0)
+    _run_blade_slot_checks(geometry, 0.0)
+
+    # f=0.5 is the ordinary mid-travel case: blade at [0,+60], cap riding
+    # directly on the blade top, no A4 coolant band.
+    geometry_f05 = build_core_geometry(withdrawn_fraction=0.5)
+    debug_model_f05 = openmc.Model(
+        geometry=geometry_f05, materials=_materials, settings=_settings
+    )
+    with tempfile.TemporaryDirectory() as _debug_dir_f05:
+        debug_model_f05.run(geometry_debug=True, cwd=_debug_dir_f05)
+    print("Overlap check (f=0.5) passed: no cell overlaps detected.")
+    _run_point_checks(geometry_f05, 0.5)
+    _run_blade_slot_checks(geometry_f05, 0.5)
 
     # f=1.0 exercises the degenerate case introduced by the axial resize:
     # blade_z_top == CORE_TOP exactly (three coincident ZPlane objects at the
@@ -1289,3 +1543,5 @@ if __name__ == '__main__':
         debug_model_f1.run(geometry_debug=True, cwd=_debug_dir_f1)
     print("Overlap check (f=1.0) passed: no cell overlaps detected "
           "(blade top coincident with CORE_TOP vacuum boundary).")
+    _run_point_checks(geometry_f1, 1.0)
+    _run_blade_slot_checks(geometry_f1, 1.0)
