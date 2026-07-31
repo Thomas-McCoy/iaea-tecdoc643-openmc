@@ -1260,11 +1260,50 @@ graphite_univ = make_graphite_element()
 
 
 # =============================================================================
-# CORE MAP — position labels for the 8x9 grid plate
+# CORE LATTICE EXTENT AND POOL WATER BOUNDARY
 #
-# Token grid mirroring lattice_universes below, one token per grid position:
-#   'S' standard fuel   'C' control fuel   'F' flux trap
-#   'G' graphite        'W' water
+# The lattice holds CORE POSITIONS ONLY — 6 (x) x 7 (y) = 42. It used to span
+# 8 x 9 including a one-cell water ring; that ring is gone and the surrounding
+# water is handled externally, as an explicit pool box.
+#
+# The ring could not simply be thickened: POOL_WATER_THICK is 5 * PITCH_X
+# exactly in x, but 38.5 / 8.1 = 4.75 in y, so no whole number of lattice rings
+# reproduces it. Hence the explicit bounding box.
+# =============================================================================
+
+N_LAT_X = 6   # core positions in x                                    [MCNP]
+N_LAT_Y = 7   # core positions in y                                    [MCNP]
+
+CORE_HALF_X = N_LAT_X / 2.0 * PITCH_X     # 23.100 cm                  [DERIVED]
+CORE_HALF_Y = N_LAT_Y / 2.0 * PITCH_Y     # 28.350 cm                  [DERIVED]
+
+# Pool water on all four lateral sides of the core.
+POOL_WATER_THICK = 38.5   # cm                                         [MCNP]
+
+POOL_HALF_X = CORE_HALF_X + POOL_WATER_THICK   # 61.600 cm             [DERIVED]
+POOL_HALF_Y = CORE_HALF_Y + POOL_WATER_THICK   # 66.850 cm             [DERIVED]
+
+# Lateral extent tripwires. Tolerance, not ==: CORE_HALF_Y runs through
+# 3.5 * 8.1, which is not exact in binary floating point.
+assert POOL_WATER_THICK > 0, "pool water thickness must be positive"
+assert abs(2 * POOL_HALF_X - 123.2) < 1e-9, \
+    f"model x-extent is {2 * POOL_HALF_X}, expected 123.2 " \
+    f"(6 x {PITCH_X} + 2 x {POOL_WATER_THICK})"
+assert abs(2 * POOL_HALF_Y - 133.7) < 1e-9, \
+    f"model y-extent is {2 * POOL_HALF_Y}, expected 133.7 " \
+    f"(7 x {PITCH_Y} + 2 x {POOL_WATER_THICK})"
+assert abs((POOL_HALF_X - CORE_HALF_X) - POOL_WATER_THICK) < 1e-12, \
+    "pool x-face is not POOL_WATER_THICK outboard of the core envelope"
+assert abs((POOL_HALF_Y - CORE_HALF_Y) - POOL_WATER_THICK) < 1e-12, \
+    "pool y-face is not POOL_WATER_THICK outboard of the core envelope"
+
+
+# =============================================================================
+# CORE MAP — position labels for the 7x6 core
+#
+# Token grid mirroring lattice_universes below, one token per CORE position:
+#   'S' standard fuel   'C' control fuel   'F' flux trap   'G' graphite
+# There is no 'W' token: since B4 the water ring is not part of the lattice.
 # A token-for-token assert in build_core_geometry() ties this grid to the
 # lattice literal, so the two can never drift apart by hand.
 #
@@ -1273,13 +1312,12 @@ graphite_univ = make_graphite_element()
 # channels — "1 at Core Center" and "1 at Core Edge" (A-2 §1: one water-filled
 # flux trap near the center of the core, another near an edge). The literal
 # below places them at D4 (center) and A6 (edge), which is the benchmark
-# configuration.
+# configuration. The 8x9 figure is the grid plate INCLUDING the surrounding
+# water ring; the 42 core positions modelled here are 7x6.
 #
-# LABELS cover the inner 6x7 region only (the fuelled/reflector positions);
-# the surrounding water ring is unlabelled. Columns A-F run left to right in
-# +x; rows 1-7 run top to bottom, so ROW 1 IS THE +y EDGE — matching the array
-# order of CORE_MAP and lattice_universes, so a reader comparing the two never
-# has to mentally flip anything.
+# Columns A-F run left to right in +x; rows 1-7 run top to bottom, so ROW 1 IS
+# THE +y EDGE — matching the array order of CORE_MAP and lattice_universes, so
+# a reader comparing the two never has to mentally flip anything.
 #
 # The letter/number convention is THIS PROJECT'S OWN — TECDOC-643 A-2 specifies
 # no element labeling scheme, so the convention itself carries no [TECDOC] tag.
@@ -1289,22 +1327,27 @@ graphite_univ = make_graphite_element()
 
 CORE_MAP_COLS = 'ABCDEF'
 CORE_MAP = [
-    ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
-    ['W', 'G', 'G', 'G', 'G', 'G', 'G', 'W'],
-    ['W', 'S', 'S', 'C', 'S', 'S', 'S', 'W'],
-    ['W', 'S', 'S', 'S', 'S', 'C', 'S', 'W'],
-    ['W', 'S', 'C', 'S', 'F', 'S', 'S', 'W'],
-    ['W', 'S', 'S', 'S', 'S', 'C', 'S', 'W'],
-    ['W', 'F', 'S', 'C', 'S', 'S', 'S', 'W'],
-    ['W', 'G', 'G', 'G', 'G', 'G', 'G', 'W'],
-    ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
+    ['G', 'G', 'G', 'G', 'G', 'G'],
+    ['S', 'S', 'C', 'S', 'S', 'S'],
+    ['S', 'S', 'S', 'S', 'C', 'S'],
+    ['S', 'C', 'S', 'F', 'S', 'S'],
+    ['S', 'S', 'S', 'S', 'C', 'S'],
+    ['F', 'S', 'C', 'S', 'S', 'S'],
+    ['G', 'G', 'G', 'G', 'G', 'G'],
 ]
 
 
 def core_map_label(row, col):
-    """Position label for grid index (row, col), or None outside the inner 6x7."""
-    if 1 <= row <= 7 and 1 <= col <= 6:
-        return f'{CORE_MAP_COLS[col - 1]}{row}'
+    """Position label for core position (row, col), or None outside the 7x6.
+
+    Re-indexed in B4 when the surrounding water ring left the lattice: the map
+    is now core positions only, so row/col are 0-based over the core itself
+    rather than offset by the ring. The LABELS THEMSELVES ARE UNCHANGED
+    (A1..F7) — they name depletion materials, and a silent shift would
+    re-point every zoned material at a different element.
+    """
+    if 0 <= row < N_LAT_Y and 0 <= col < N_LAT_X:
+        return f'{CORE_MAP_COLS[col]}{row + 1}'
     return None
 
 
@@ -1322,16 +1365,39 @@ def core_map_labels(token):
 STD_ELEMENT_IDS  = core_map_labels('S')   # 23 standard element positions
 CTRL_ELEMENT_IDS = core_map_labels('C')   # 5 control element positions
 
+assert len(CORE_MAP) == N_LAT_Y, \
+    f"CORE_MAP has {len(CORE_MAP)} rows, expected N_LAT_Y={N_LAT_Y}"
+assert all(len(r) == N_LAT_X for r in CORE_MAP), \
+    f"every CORE_MAP row must have N_LAT_X={N_LAT_X} entries"
+assert not any('W' in r for r in CORE_MAP), \
+    "CORE_MAP must hold core positions only — the water ring left the lattice in B4"
 assert len(STD_ELEMENT_IDS) == 23, \
     f"CORE_MAP has {len(STD_ELEMENT_IDS)} 'S' positions, expected 23"
 assert len(CTRL_ELEMENT_IDS) == 5, \
     f"CORE_MAP has {len(CTRL_ELEMENT_IDS)} 'C' positions, expected 5"
 assert sum(r.count('F') for r in CORE_MAP) == 2, \
     "CORE_MAP must have exactly 2 flux traps (A-2 Table 1: 1 center, 1 edge)"
+assert sum(r.count('G') for r in CORE_MAP) == 12, \
+    "CORE_MAP must have exactly 12 graphite reflector positions"
+assert sum(len(r) for r in CORE_MAP) == 42 == N_LAT_X * N_LAT_Y, \
+    "core positions must total 42 = 7x6"
 assert None not in STD_ELEMENT_IDS + CTRL_ELEMENT_IDS, \
-    "a fuelled position fell outside the labelled inner 6x7 region"
+    "a fuelled position fell outside the labelled 7x6 core"
 assert len(set(STD_ELEMENT_IDS + CTRL_ELEMENT_IDS)) == 28, \
     "duplicate core-map labels"
+
+# Label pin. These strings name depletion materials, so the B4 re-indexing of
+# core_map_label() had to leave them byte-identical. Any future re-indexing that
+# shifts them silently re-points every zoned material at a different element.
+assert STD_ELEMENT_IDS == [
+    'A2', 'B2', 'D2', 'E2', 'F2', 'A3', 'B3', 'C3', 'D3', 'F3',
+    'A4', 'C4', 'E4', 'F4', 'A5', 'B5', 'C5', 'D5', 'F5',
+    'B6', 'D6', 'E6', 'F6'], \
+    f"standard element labels moved: {STD_ELEMENT_IDS}"
+assert CTRL_ELEMENT_IDS == ['C2', 'E3', 'B4', 'E5', 'C6'], \
+    f"control element labels moved: {CTRL_ELEMENT_IDS}"
+assert core_map_labels('F') == ['D4', 'A6'], \
+    f"flux trap positions moved: {core_map_labels('F')}"
 
 
 # =============================================================================
@@ -1352,9 +1418,11 @@ def build_core_geometry(withdrawn_fraction=1.0, depletion_zoning=False):
     move. With it off the model is byte-for-byte what it has always been.
 
     This is the single construction path used by core.build_model() and all
-    run/ drivers. Vacuum boundaries at the lattice edge and at
-    CORE_BOTTOM=-90 / CORE_TOP=+90 accommodate the full axial stack
-    (water/end-box/fuel/end-box/water); the withdrawn (f=1) blade top
+    run/ drivers. The 7x6 lattice sits inside a water-filled pool box whose
+    lateral faces are POOL_WATER_THICK = 38.5 cm outboard of the core envelope;
+    the vacuum boundary is there, not at the lattice edge. Vacuum at
+    CORE_BOTTOM=-90 / CORE_TOP=+90 accommodates the full axial stack
+    (water/end-box/clad/meat/clad/end-box/water); the withdrawn (f=1) blade top
     coincides exactly with CORE_TOP, so there is no water cap above it.
     """
     std_elems  = [make_standard_fuel_element(
@@ -1372,15 +1440,13 @@ def build_core_geometry(withdrawn_fraction=1.0, depletion_zoning=False):
     F = make_flux_trap()
 
     lattice_universes = [
-        [W, W, W, W, W, W, W, W],
-        [W, G, G, G, G, G, G, W],
-        [W, S[0],  S[1],  C[0],  S[2],  S[3],  S[4],  W],
-        [W, S[5],  S[6],  S[7],  S[8],  C[1],  S[9],  W],
-        [W, S[10], C[2],  S[11], F,     S[12], S[13], W],
-        [W, S[14], S[15], S[16], S[17], C[3],  S[18], W],
-        [W, F,     S[19], C[4],  S[20], S[21], S[22], W],
-        [W, G, G, G, G, G, G, W],
-        [W, W, W, W, W, W, W, W],
+        [G,     G,     G,     G,     G,     G    ],
+        [S[0],  S[1],  C[0],  S[2],  S[3],  S[4] ],
+        [S[5],  S[6],  S[7],  S[8],  C[1],  S[9] ],
+        [S[10], C[2],  S[11], F,     S[12], S[13]],
+        [S[14], S[15], S[16], S[17], C[3],  S[18]],
+        [F,     S[19], C[4],  S[20], S[21], S[22]],
+        [G,     G,     G,     G,     G,     G    ],
     ]
 
     # CORE_MAP must mirror the lattice literal token for token. This is the
@@ -1400,29 +1466,47 @@ def build_core_geometry(withdrawn_fraction=1.0, depletion_zoning=False):
 
     core_lattice = openmc.RectLattice(name='core_lattice')
     core_lattice.pitch      = (PITCH_X, PITCH_Y)
-    core_lattice.lower_left = (-4 * PITCH_X, -4.5 * PITCH_Y)
+    core_lattice.lower_left = (-CORE_HALF_X, -CORE_HALF_Y)
     core_lattice.universes  = lattice_universes
     # Guard against edge-case lattice lookups just outside the universe array
     # (floating-point roundoff at the boundary planes) — fill with bulk water
-    # instead of losing the particle.
+    # instead of losing the particle. Kept as roundoff insurance even though the
+    # lattice is now exactly coincident with the core envelope planes.
     core_lattice.outer      = water_univ
 
-    core_left   = openmc.XPlane(x0=-4   * PITCH_X, boundary_type='vacuum')
-    core_right  = openmc.XPlane(x0= 4   * PITCH_X, boundary_type='vacuum')
-    core_front  = openmc.YPlane(y0=-4.5 * PITCH_Y, boundary_type='vacuum')
-    core_back   = openmc.YPlane(y0= 4.5 * PITCH_Y, boundary_type='vacuum')
+    # Core envelope — TRANSMISSIVE. These used to be the vacuum boundary; since
+    # B4 the vacuum sits POOL_WATER_THICK further out, on the pool faces.
+    core_left   = openmc.XPlane(x0=-CORE_HALF_X)
+    core_right  = openmc.XPlane(x0= CORE_HALF_X)
+    core_front  = openmc.YPlane(y0=-CORE_HALF_Y)
+    core_back   = openmc.YPlane(y0= CORE_HALF_Y)
+
+    # Pool box lateral faces — vacuum, 38.5 cm outboard of the core envelope.
+    pool_left   = openmc.XPlane(x0=-POOL_HALF_X, boundary_type='vacuum')
+    pool_right  = openmc.XPlane(x0= POOL_HALF_X, boundary_type='vacuum')
+    pool_front  = openmc.YPlane(y0=-POOL_HALF_Y, boundary_type='vacuum')
+    pool_back   = openmc.YPlane(y0= POOL_HALF_Y, boundary_type='vacuum')
+
     core_bottom = openmc.ZPlane(z0=CORE_BOTTOM,     boundary_type='vacuum')
     core_top    = openmc.ZPlane(z0=CORE_TOP,        boundary_type='vacuum')
 
-    core_region = (
-        +core_left  & -core_right  &
-        +core_front & -core_back   &
-        +core_bottom & -core_top
-    )
-    core_cell = openmc.Cell(name='core_cell', fill=core_lattice,
-                            region=core_region)
+    core_box_xy = +core_left & -core_right & +core_front & -core_back
+    axial_span  = +core_bottom & -core_top
 
-    root_universe = openmc.Universe(name='root', cells=[core_cell])
+    core_cell = openmc.Cell(name='core_cell', fill=core_lattice,
+                            region=core_box_xy & axial_span)
+
+    # Pool water — the 294 K BULK water, not the 316.8 K core coolant.
+    # Written as the pool box minus the core box rather than as four slabs:
+    # the complement is watertight at the corners, which is exactly where a
+    # hand-written slab decomposition leaves undefined space that passes an
+    # overlap check and still leaks particles.
+    pool_cell = openmc.Cell(
+        name='pool_water', fill=water,
+        region=(+pool_left & -pool_right & +pool_front & -pool_back &
+                axial_span & ~core_box_xy))
+
+    root_universe = openmc.Universe(name='root', cells=[core_cell, pool_cell])
     return openmc.Geometry(root_universe)
 
 
@@ -1437,10 +1521,21 @@ def _lattice_center(row, col):
     Mirrors the lattice lower_left used in build_core_geometry(); row 0 is the
     +y edge, matching CORE_MAP's array order.
     """
-    n_rows = len(CORE_MAP)
-    ll_x, ll_y = -4 * PITCH_X, -4.5 * PITCH_Y
-    return (ll_x + (col + 0.5) * PITCH_X,
-            ll_y + (n_rows - 1 - row + 0.5) * PITCH_Y)
+    return (-CORE_HALF_X + (col + 0.5) * PITCH_X,
+            -CORE_HALF_Y + (N_LAT_Y - 1 - row + 0.5) * PITCH_Y)
+
+
+def _first_position(tok):
+    """(row, col) of the first CORE_MAP cell carrying `tok`, row-major.
+
+    Used to anchor the point checks by TOKEN rather than by hardcoded index, so
+    they survive a core-map edit instead of silently probing the wrong element.
+    """
+    for i, row in enumerate(CORE_MAP):
+        for j, t in enumerate(row):
+            if t == tok:
+                return i, j
+    raise AssertionError(f"CORE_MAP has no '{tok}' position")
 
 
 def _material_at(geom, x, y, z):
@@ -1461,8 +1556,7 @@ def _run_point_checks(geom, f):
     back as the wrong material (or None) means a band is mis-clipped or has
     been left as undefined space.
     """
-    row, col = 2, 1                          # CORE_MAP 'S' position A2
-    assert CORE_MAP[row][col] == 'S', "point-check anchor is not a standard element"
+    row, col = _first_position('S')          # first standard element (A2)
     ex, ey = _lattice_center(row, col)
 
     # Centreline of plate 0's meat, derived exactly as the builder lays it out.
@@ -1494,9 +1588,8 @@ def _run_point_checks(geom, f):
     # B2 — the flux-trap and graphite blocks are 7.6 x 8.0 inside the pitch, so
     # a probe just inside the block edge must be solid and a probe in the pitch
     # gap must be water. Sampling at z=0 and at the top of the clad band.
-    for row_b, col_b, tok, solid in ((4, 4, 'F', aluminum), (1, 1, 'G', graphite)):
-        assert CORE_MAP[row_b][col_b] == tok, \
-            f"B2 point-check anchor ({row_b},{col_b}) is not '{tok}'"
+    for tok, solid in (('F', aluminum), ('G', graphite)):
+        row_b, col_b = _first_position(tok)
         bx, by = _lattice_center(row_b, col_b)
         blk_x = FT_BLOCK_X if tok == 'F' else REFL_BLOCK_X
         # Just inside the block edge in x (clear of the flux-trap hole).
@@ -1513,8 +1606,29 @@ def _run_point_checks(geom, f):
             f"f={f}: '{tok}' block at z={z_mid_clad_ext} is '{top}', " \
             f"expected '{solid.name}'"
 
+    # B4 — pool water. Probed 30 cm outboard of the core edge on each lateral
+    # face (inside the 38.5 cm pool), plus both diagonal corners, which is where
+    # a slab decomposition of the pool would have left undefined space.
+    pool_probes = [
+        ( CORE_HALF_X + 30.0, 0.0,                 '+x face'),
+        (-CORE_HALF_X - 30.0, 0.0,                 '−x face'),
+        (0.0,                  CORE_HALF_Y + 30.0, '+y face'),
+        (0.0,                 -CORE_HALF_Y - 30.0, '−y face'),
+        ( CORE_HALF_X + 30.0,  CORE_HALF_Y + 30.0, '+x+y corner'),
+        (-CORE_HALF_X - 30.0, -CORE_HALF_Y - 30.0, '−x−y corner'),
+    ]
+    for wx, wy, label in pool_probes:
+        for wz in (0.0, ENDBOX_ABOVE_TOP + 1.0, CORE_BOTTOM + 1.0):
+            got = _material_at(geom, wx, wy, wz)
+            assert got is not None, \
+                f"f={f}: pool water {label} at z={wz} is UNDEFINED SPACE"
+            assert got == water.name, (
+                f"f={f}: pool water {label} at z={wz} is '{got}', expected "
+                f"'{water.name}' (294 K bulk water, not the core coolant)")
+
     print(f"  point checks (f={f}): axial stack "
-          f"meat/clad-ext/end-box/water and 7.6x8.0 blocks + gaps all resolve")
+          f"meat/clad-ext/end-box/water, 7.6x8.0 blocks + gaps, "
+          f"and pool water all resolve")
 
 
 def _run_blade_slot_checks(geom, f):
@@ -1526,8 +1640,7 @@ def _run_blade_slot_checks(geom, f):
     Once the blade is withdrawn past +31 the coolant band closes up and the cap
     sits directly on the blade top again.
     """
-    row, col = 2, 3                          # CORE_MAP 'C' position D2
-    assert CORE_MAP[row][col] == 'C', "slot-check anchor is not a control element"
+    row, col = _first_position('C')          # first control element (C2)
     ex, ey = _lattice_center(row, col)
 
     # Centreline of the lower absorber slot, built outward exactly as the
@@ -1610,6 +1723,14 @@ if __name__ == '__main__':
     print(f"End-box below:        [{ENDBOX_BELOW_BOT}, {-HALF_PLATE_Z}] cm "
           f"({ENDBOX_HEIGHT} cm)")
     print(f"Core z-bounds:        [{CORE_BOTTOM}, {CORE_TOP}] cm (vacuum)")
+    print(f"Core positions:       {N_LAT_X} (x) x {N_LAT_Y} (y) = "
+          f"{N_LAT_X * N_LAT_Y}")
+    print(f"Core envelope:        x +/-{CORE_HALF_X}, y +/-{CORE_HALF_Y} cm "
+          f"(transmissive)")
+    print(f"Pool water:           {POOL_WATER_THICK} cm all four sides, "
+          f"294 K bulk water")
+    print(f"Model extent:         x {2 * POOL_HALF_X} x y {2 * POOL_HALF_Y} x "
+          f"z {CORE_TOP - CORE_BOTTOM} cm (vacuum at pool faces)")
     print(f"Axial stack sum:      2 x ({POOL_WATER_AXIAL} + {ENDBOX_HEIGHT} + "
           f"{CLAD_EXT} + {HALF_Z}) = {_AXIAL_STACK_SUM} cm")
     print(f"Active-zone gap width: GAP_X={GAP_X:.4f} cm, GAP_Y={GAP_Y:.4f} cm "
