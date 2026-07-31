@@ -4,10 +4,19 @@
 *.out
 run_results/
 
-# Generated plots — ignored by default; curated verification plots under
-# plots/ are tracked explicitly.
+# Generated plots. ALL of them, including plots/ — there is no exception.
+#
+# There used to be a `!plots/*.png` re-inclusion for "curated verification
+# plots". That exception was the defect: it made generated artifacts
+# publishable, and twelve plots depicting geometry that no longer existed
+# (60 cm plates, 15 cm end-box, 8x9 lattice, 2.5 cm flux trap) sat tracked in
+# the repository from 2026-07-27 until the Phase 1 audit found them.
+#
+# Generators are tracked and are deterministic — tests/plot_core.py and
+# tests/make_phase1_xs_plots.py both rebuild their output from geometry.py
+# constants alone. Tracking the generator is sufficient; tracking its output
+# means the repository can assert something the code does not.
 *.png
-!plots/*.png
 
 # figures/ tracks SOURCE ONLY (make_figures.py, check_figures.py, figstyle.py).
 # Everything it emits is regenerable from those three plus geometry.py, and the
