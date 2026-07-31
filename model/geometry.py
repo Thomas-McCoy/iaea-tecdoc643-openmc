@@ -1599,6 +1599,30 @@ def _run_point_checks(geom, f):
         assert got == want.name, \
             f"f={f}: {label} at {point} is '{got}', expected '{want.name}'"
 
+    # B1 — the clad extension band is not only clad. The coolant channels and
+    # the inter-element water gaps were clipped to +/-30 alongside the plates
+    # and had to be extended to +/-31 with them. Pinned explicitly at z = 30.5,
+    # both signs: had any of these been missed, the band would read as
+    # UNDEFINED SPACE rather than water, and an overlap check would not catch it.
+    chan0_y  = -(STD_STACK_HEIGHT / 2.0) + PLATE_THICK_OUTER + WATER_CHAN_THICK / 2.0
+    gap_dx   = (ELEM_X + PITCH_X) / 4.0     # centre of the x gap, 3.825
+    gap_dy   = (ELEM_Y + PITCH_Y) / 4.0     # centre of the y gap, 4.025
+    band_probes = [
+        (ex,          ey + chan0_y, 'coolant channel 0'),
+        (ex - gap_dx, ey,           'inter-element gap, -x'),
+        (ex + gap_dx, ey,           'inter-element gap, +x'),
+        (ex,          ey - gap_dy,  'inter-element gap, -y'),
+        (ex,          ey + gap_dy,  'inter-element gap, +y'),
+    ]
+    for bx, by, label in band_probes:
+        for bz in (0.0, z_mid_clad_ext, -z_mid_clad_ext):
+            got = _material_at(geom, bx, by, bz)
+            assert got is not None, \
+                f"f={f}: {label} at z={bz} is UNDEFINED SPACE (no material)"
+            assert got == water_core.name, (
+                f"f={f}: {label} at z={bz} is '{got}', expected "
+                f"'{water_core.name}'")
+
     # B2 — the flux-trap and graphite blocks are 7.6 x 8.0 inside the pitch, so
     # a probe just inside the block edge must be solid and a probe in the pitch
     # gap must be water. Sampling at z=0 and at the top of the clad band.
