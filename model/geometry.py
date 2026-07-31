@@ -202,8 +202,20 @@ assert abs(HALF_PLATE_Z - (HALF_Z + CLAD_EXT)) < 1e-12, \
 # AXIAL MODEL EXTENTS AND FIXED-LENGTH BLADE PARAMETERS
 # =============================================================================
 
+# Absorber blade height. [MCNP] — cross-validation spreadsheet row "Absorber
+# (B4C) blade height", MCNP 60.0000, MATCH.
 BLADE_LENGTH     = 60.0    # cm — rigid absorber blade (fixed length, translates in z)
-ROD_TRAVEL       = 60.0    # cm — full stroke
+
+# Full stroke. [DERIVED] from MEAT_HEIGHT, NOT from BLADE_LENGTH — the two are
+# both 60.0 by coincidence, not by relationship. The stroke is fixed by this
+# model's blade convention: at f=0 the blade spans the active meat exactly, and
+# at f=1 its bottom sits exactly on the meat top, so
+#     z_bot(f=1) = -HALF_Z + ROD_TRAVEL = +HALF_Z  =>  ROD_TRAVEL = MEAT_HEIGHT.
+# The convention itself ("fully withdrawn" = blade clear of the active meat) is
+# this project's modelling choice; the spreadsheet carries no rod-stroke row.
+# Deriving it from MEAT_HEIGHT is what stops a compensating error in
+# ROD_TRAVEL and BLADE_LENGTH from satisfying the f=1 pin below.
+ROD_TRAVEL       = MEAT_HEIGHT   # 60.0 cm                            [DERIVED]
 
 # Blade TOP cladding — aluminum riding on the B4C, part of the blade assembly.
 # [MCNP] Kyle confirmed 2026-07-31: 1.0 cm, TOP END ONLY (side and bottom clad
@@ -214,9 +226,14 @@ ROD_TRAVEL       = 60.0    # cm — full stroke
 # B4C that touches CORE_TOP at f=1, and the clad above it clips away at the
 # model boundary exactly as the cap does.
 BLADE_TOP_CLAD   = CLAD_EXT   # 1.0 cm [MCNP]
-CORE_TOP         = +90.0   # cm — vacuum boundary; COINCIDES with the fully-withdrawn
-                            # (f=1) blade top (z_top = -30 + 60 + 60 = +90). No cap above.
-CORE_BOTTOM      = -90.0   # cm — vacuum boundary; symmetric with CORE_TOP
+# Model axial extent. [MCNP] — cross-validation spreadsheet row "Model
+# dimension (Z)", MCNP 180.000, MATCH. Note the confirmed quantity is the
+# 180.000 TOTAL; the +/-90 split follows from the symmetry-about-z=0 assert
+# below, not from a separate confirmed row.
+CORE_TOP         = +90.0   # cm — vacuum boundary                          [MCNP]
+                            # COINCIDES with the fully-withdrawn (f=1) blade top
+                            # (z_top = -30 + 60 + 60 = +90). No cap above.
+CORE_BOTTOM      = -90.0   # cm — vacuum boundary; symmetric with CORE_TOP  [MCNP]
 
 # Homogenized end-box axial extent. The plates gaining 1 cm at each end and the
 # end-box losing 1 cm are the same centimetre — +/-45 and +/-90 do not move.
@@ -629,7 +646,9 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
 #   fill z outside [-31, +31].
 # =============================================================================
 
-ABSORBER_THICK  = 0.31
+# Absorber blade thickness (y). [MCNP] — cross-validation spreadsheet row
+# "Absorber (B4C) blade thickness", MCNP 0.3100, MATCH.
+ABSORBER_THICK  = 0.31   # cm                                          [MCNP]
 
 # Absorber blade WIDTH (x). This is a different physical quantity from
 # ACTIVE_STACK_X = 6.640, the coolant channel width, which is unchanged and
