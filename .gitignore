@@ -9,6 +9,13 @@ run_results/
 *.png
 !plots/*.png
 
+# figures/ tracks SOURCE ONLY (make_figures.py, check_figures.py, figstyle.py).
+# Everything it emits is regenerable from those three plus geometry.py, and the
+# PDFs run to several MB apiece.
+*.pdf
+figures/_proof/
+figures/solidworks_*.txt
+
 # Python
 __pycache__/
 *.py[cod]
