@@ -79,11 +79,12 @@ from materials import (fuel, clad, water, water_core, b4c, graphite, aluminum,
 # LATTICE / ELEMENT ENVELOPE
 # =============================================================================
 
-PITCH_X = 7.7    # cm  (77 mm)
-PITCH_Y = 8.1    # cm  (81 mm)
+PITCH_X = 7.7    # cm  (77 mm)   lattice pitch          [TECDOC] (MCNP MATCH)
+PITCH_Y = 8.1    # cm  (81 mm)   lattice pitch          [TECDOC] (MCNP MATCH)
 
-ELEM_X = 7.6     # cm  (76 mm)
-ELEM_Y = 8.0     # cm  (80 mm)
+ELEM_X = 7.6     # cm  (76 mm)   element envelope       [TECDOC] (MCNP MATCH)
+ELEM_Y = 8.0     # cm  (80 mm)   element envelope; also [TECDOC] (MCNP MATCH)
+                 #                the side plate width (8.000)
 
 # --- Axial plate / meat heights ---------------------------------------------
 # The reference MCNP model carries 1 cm of UNFUELED cladding above and below
@@ -91,6 +92,7 @@ ELEM_Y = 8.0     # cm  (80 mm)
 # MEAT_HEIGHT and PLATE_HEIGHT are INDEPENDENT primaries; the clad extension is
 # derived from the pair and is never written as a literal anywhere.
 MEAT_HEIGHT  = 60.0   # cm (600 mm) — active fuel meat height  [TECDOC] (MCNP MATCH)
+                      # completes the meat block: 0.051 x 6.300 x 60.000
 PLATE_HEIGHT = 62.0   # cm (620 mm) — fuel / unfueled plate height   [MCNP]
 CLAD_EXT     = (PLATE_HEIGHT - MEAT_HEIGHT) / 2.0   # 1.0 cm          [DERIVED]
 
@@ -130,36 +132,43 @@ assert abs((PITCH_X - REFL_BLOCK_X) / 2.0 - GAP_X) < 1e-12, \
 assert abs((PITCH_Y - REFL_BLOCK_Y) / 2.0 - GAP_Y) < 1e-12, \
     "reflector block does not leave the standard inter-element gap in y"
 
-SIDE_PLATE_THICK = 0.48   # cm  (4.8 mm)
-ACTIVE_STACK_X   = ELEM_X - 2 * SIDE_PLATE_THICK   # 6.64 cm
+SIDE_PLATE_THICK = 0.48   # cm (4.8 mm) side plate      [TECDOC] (MCNP MATCH)
+
+# Interior coolant channel width — the clear span between the side plates.
+# 6.640, a MATCH row, and NOT the absorber blade width (see ABSORBER_WIDTH).
+ACTIVE_STACK_X   = ELEM_X - 2 * SIDE_PLATE_THICK   # 6.64 cm        [DERIVED]
 
 # =============================================================================
 # PLATE / MEAT / CLAD DIMENSIONS
 # =============================================================================
 
-PLATE_THICK_INNER = 0.127    # cm  (1.27 mm)
+PLATE_THICK_INNER = 0.127    # cm (1.27 mm) inner plate [TECDOC] (MCNP MATCH)
 
-CLAD_THICK_INNER = 0.038     # cm  (0.38 mm)
-CLAD_THICK_OUTER = 0.0495    # cm  (0.495 mm)
+CLAD_THICK_INNER = 0.038     # cm (0.38 mm)  inner clad  [TECDOC] (MCNP MATCH)
+CLAD_THICK_OUTER = 0.0495    # cm (0.495 mm) outer clad  [TECDOC] (MCNP MATCH)
 
-MEAT_THICK = 0.051           # cm  (0.51 mm)
-MEAT_WIDTH = 6.3             # cm  (63 mm)
+MEAT_THICK = 0.051           # cm (0.51 mm) meat thick   [TECDOC] (MCNP MATCH)
+MEAT_WIDTH = 6.3             # cm (63 mm)   meat width   [TECDOC] (MCNP MATCH)
 
 # Outer plates (first/last in the stack) are clad at the outer thickness on
 # BOTH faces of the meat, not just the face away from the stack — so their
 # total thickness is meat + 2*CLAD_THICK_OUTER, not meat + inner + outer.
-PLATE_THICK_OUTER = MEAT_THICK + 2 * CLAD_THICK_OUTER   # 0.15 cm  (1.5 mm)
+PLATE_THICK_OUTER = MEAT_THICK + 2 * CLAD_THICK_OUTER   # 0.15 cm  [DERIVED]
+                                                        # (1.5 mm, MCNP MATCH)
 
-N_PLATES_STD  = 23
-N_PLATES_CTRL = 17
+N_PLATES_STD  = 23           # fuel plates per standard element  [TECDOC]
+N_PLATES_CTRL = 17           # fuel plates per control element   [TECDOC]
 
-WATER_CHAN_THICK = 0.219     # cm  (2.19 mm)
+# Interior coolant channel, plate to plate.
+WATER_CHAN_THICK = 0.219     # cm (2.19 mm)             [TECDOC] (MCNP MATCH)
 
 # Standard element plate-stack height and the residual end water gap between
 # the outermost plate face and the element envelope edge. [DERIVED]
 STD_STACK_HEIGHT = (2 * PLATE_THICK_OUTER
                     + (N_PLATES_STD - 2) * PLATE_THICK_INNER
                     + (N_PLATES_STD - 1) * WATER_CHAN_THICK)   # 7.785 cm
+# Exterior (element-end) coolant channel: 0.1075. A3 leaves this [DERIVED] —
+# the MCNP column is blank, so there is nothing to reconcile it against yet.
 STD_END_WATER = (ELEM_Y - STD_STACK_HEIGHT) / 2.0             # 0.1075 cm  [DERIVED]
 assert STD_END_WATER > 0, "standard element end water gap must be positive"
 
@@ -625,6 +634,8 @@ assert ABSORBER_SIDE_WATER > 0.0, \
 
 CTRL_FUEL_WIDTH_X   = ACTIVE_STACK_X
 CTRL_SIDE_PLATE_X   = SIDE_PLATE_THICK
+# Unfueled (control-element) plate thickness. B5: ours is the CORRECT side —
+# the MCNP model's 0.150 is being corrected there. Do not change this to match.
 CTRL_AL_PLATE_THICK = 0.127   # cm (1.27 mm) [TECDOC] — was 0.15 (an Argonne
                               # TH-analysis convenience); reverted 2026-07-20.
 CTRL_HF_THICK       = ABSORBER_THICK
