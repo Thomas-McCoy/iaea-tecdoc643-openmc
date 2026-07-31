@@ -272,6 +272,17 @@ assert abs(_AXIAL_STACK_SUM - (CORE_TOP - CORE_BOTTOM)) < 1e-12, \
 assert abs((-HALF_Z + ROD_TRAVEL + BLADE_LENGTH) - CORE_TOP) < 1e-12, \
     "f=1 blade top no longer coincides with CORE_TOP — cap logic assumes it does"
 
+# The pin above constrains only the SUM of ROD_TRAVEL and BLADE_LENGTH, so
+# offsetting errors in the two would satisfy it. Pin each independently:
+# ROD_TRAVEL to the stroke convention it derives from, BLADE_LENGTH to its
+# spreadsheet row.
+assert abs(ROD_TRAVEL - MEAT_HEIGHT) < 1e-12, (
+    f"ROD_TRAVEL is {ROD_TRAVEL}, not MEAT_HEIGHT {MEAT_HEIGHT} — the f=1 "
+    f"blade bottom would no longer land on the meat top")
+assert abs(BLADE_LENGTH - 60.0) < 1e-12, (
+    f"BLADE_LENGTH is {BLADE_LENGTH}, not the 60.000 of the cross-validation "
+    f"row 'Absorber (B4C) blade height' (MCNP 60.0000)")
+
 # Shared axial ZPlane surfaces — transmission (NOT vacuum boundaries).
 # Defined once at module level and reused in every element universe to avoid
 # creating redundant surfaces at identical z-values.
@@ -650,6 +661,17 @@ def make_standard_fuel_element(elem_id, element_id=None, zoned=False):
 # "Absorber (B4C) blade thickness", MCNP 0.3100, MATCH.
 ABSORBER_THICK  = 0.31   # cm                                          [MCNP]
 
+# Pin ABSORBER_THICK to its spreadsheet value directly. This is the D3 fix: the
+# control end-block budget closes BY CONSTRUCTION because CTRL_BLADE_WATER is
+# its residual, so an error in this constant would be absorbed silently into
+# the blade-water gap and every layer-sum assert would still pass. Until now
+# the only thing catching that was the CTRL_BLADE_WATER pin further down —
+# a single point of failure. Pinning both ends removes it.
+assert ABSORBER_THICK > 0.0, "absorber blade thickness must be positive"
+assert abs(ABSORBER_THICK - 0.310) < 1e-12, (
+    f"ABSORBER_THICK is {ABSORBER_THICK}, not the 0.310 of the "
+    f"cross-validation row 'Absorber (B4C) blade thickness' (MCNP 0.3100)")
+
 # Absorber blade WIDTH (x). This is a different physical quantity from
 # ACTIVE_STACK_X = 6.640, the coolant channel width, which is unchanged and
 # stays a MATCH row. Before B3 the two were ALIASED: the absorber slot took its
@@ -742,6 +764,18 @@ assert abs(CTRL_BLADE_WATER - 0.1275) < 1e-9, (
     f"CTRL_BLADE_WATER derives to {CTRL_BLADE_WATER:.6f}, not the 0.1275 the "
     f"2026-07-31 A3 decision quotes — the end-block budget no longer closes "
     f"on Kyle's pair (outer offset {CTRL_OUTER_OFFSET})")
+
+# Guide-channel span — the full inner span between the two guide plates that
+# the blade rides in. This is the quantity the cross-validation row "Control
+# guide coolant channel thickness" carries (Kyle: 0.5650), NOT the per-side
+# CTRL_BLADE_WATER. Asserted directly rather than left pinned transitively
+# through ABSORBER_THICK and CTRL_BLADE_WATER, so the spreadsheet row has an
+# assert that names it.
+CTRL_GUIDE_SPAN = ABSORBER_THICK + 2.0 * CTRL_BLADE_WATER   # 0.565 cm [DERIVED]
+
+assert abs(CTRL_GUIDE_SPAN - 0.5650) < 1e-9, (
+    f"CTRL_GUIDE_SPAN is {CTRL_GUIDE_SPAN:.6f}, not the 0.5650 of the "
+    f"cross-validation row 'Control guide coolant channel thickness'")
 
 assert CTRL_BLADE_WATER >= 0.05, (
     f"CTRL_BLADE_WATER={CTRL_BLADE_WATER:.5f} cm is degenerate for "
