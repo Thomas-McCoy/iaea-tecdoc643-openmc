@@ -269,6 +269,20 @@ assert abs(_AXIAL_STACK_SUM - (CORE_TOP - CORE_BOTTOM)) < 1e-12, \
 
 # Blade travel is unchanged by B1: the f=1 blade top must still land exactly on
 # CORE_TOP, which is what makes the withdrawn case create no cap at all.
+#
+# READ BEFORE SIMPLIFYING EITHER SIDE. This pin combines values from three
+# different sources that happen to close exactly:
+#   ROD_TRAVEL   = MEAT_HEIGHT   — a PROJECT CONVENTION ("fully withdrawn"
+#                                  means the blade clears the active meat);
+#                                  no spreadsheet row exists for it
+#   BLADE_LENGTH = 60.0          — [MCNP], spreadsheet MATCH
+#   CORE_TOP     = +90.0         — [MCNP], from the 180.000 model-Z row
+# That the B4C top touches the model top at full withdrawal is real — Kyle
+# confirmed it, and it is why the withdrawn case creates no cap. But it is an
+# ALIGNMENT OF INDEPENDENTLY SOURCED VALUES, not a derivation: none of the
+# three follows from the other two. Do not "simplify" by defining one in terms
+# of the others. If any of the three is ever revised on its own the alignment
+# breaks, and this assert is what says so.
 assert abs((-HALF_Z + ROD_TRAVEL + BLADE_LENGTH) - CORE_TOP) < 1e-12, \
     "f=1 blade top no longer coincides with CORE_TOP — cap logic assumes it does"
 
