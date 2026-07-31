@@ -66,22 +66,29 @@ settings.inactive   = 50      # discard first 50 batches (source convergence)
 # OpenMC needs a starting guess for where fission neutrons come from.
 # We use a uniform spatial distribution across the active core volume.
 #
-# The source is a box spanning the active fuel region:
-#   x: -3*PITCH_X to +3*PITCH_X  (covers the 5-wide fuel columns)
-#   y: -3*PITCH_Y to +3*PITCH_Y  (covers the 6-tall fuel rows)
-#   z: -30.0 to +30.0 cm         (active fuel height)
+# The core is 6 (x) x 7 (y) core positions. The FUELLED sub-block — the 28
+# standard and control elements, excluding the graphite reflector rows at the
+# top and bottom — is 6 columns wide and 5 rows tall, spanning +/-23.1 cm in x
+# and +/-20.25 cm in y. The box below covers it with margin in y:
+#   x: -3*PITCH_X to +3*PITCH_X  = +/-23.10 cm  (the full 6 fuel columns)
+#   y: -3*PITCH_Y to +3*PITCH_Y  = +/-24.30 cm  (covers the 5 fuel rows)
+#   z: -HALF_Z to +HALF_Z        = +/-30.00 cm  (active fuel meat height)
+#
+# Points landing in graphite, flux traps or water gaps are discarded by the
+# fissionable constraint below, so over-coverage is harmless.
 #
 # OpenMC will refine this distribution over the inactive batches
 # until it converges to the true fission source shape.
 # =============================================================================
 
-# Core active region bounds (approximate, matches fuel element positions)
-PITCH_X = 7.7   # cm
-PITCH_Y = 8.1   # cm
+# Bounds are IMPORTED from geometry.py, never restated. They were local
+# PITCH_X/PITCH_Y = 7.7/8.1 and +/-30.0 literals until 2026-07-31; the audit
+# flagged them as the last surviving duplication of geometry constants.
+from geometry import PITCH_X, PITCH_Y, HALF_Z
 
 source_box = openmc.stats.Box(
-    lower_left  = (-3 * PITCH_X, -3 * PITCH_Y, -30.0),
-    upper_right = ( 3 * PITCH_X,  3 * PITCH_Y,  30.0),
+    lower_left  = (-3 * PITCH_X, -3 * PITCH_Y, -HALF_Z),
+    upper_right = ( 3 * PITCH_X,  3 * PITCH_Y,  HALF_Z),
 )
 
 # 'constraints' replaces the deprecated Box(only_fissionable=True) in 0.15.0:

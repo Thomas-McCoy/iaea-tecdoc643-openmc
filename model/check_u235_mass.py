@@ -7,7 +7,9 @@ import materials
 import geometry as g
 
 fuel = materials.fuel
-ACTIVE_H = 60.0   # meat z-extent, cm (meat_zbot=-30 .. meat_ztop=+30)
+# Meat z-extent comes from geometry.MEAT_HEIGHT (60.0 cm, meat planes at
+# -30/+30). It was a local ACTIVE_H = 60.0 literal until 2026-07-31 — a
+# duplication of a geometry constant in a file that already imports geometry.
 
 def u235_mass(volume_cm3):
     """Clone the shared fuel object so its .volume stays clean, return g U-235."""
@@ -30,7 +32,7 @@ for i, pt in enumerate(std_plate_thicks):
     is_outer = (i == 0 or i == g.N_PLATES_STD - 1)
     clad = g.CLAD_THICK_OUTER if is_outer else g.CLAD_THICK_INNER
     meat_h = pt - 2 * clad
-    v_plate = g.MEAT_WIDTH * meat_h * ACTIVE_H
+    v_plate = g.MEAT_WIDTH * meat_h * g.MEAT_HEIGHT
     v_std += v_plate
     if i < 2 or i == g.N_PLATES_STD - 1:   # show first two + last to spot-check
         tag = "outer" if is_outer else "inner"
@@ -44,9 +46,9 @@ print(f"  U-235 per std element       = {u235_mass(v_std):.4f} g  [DERIVED]\n")
 # ------------------------------------------------------------------
 print("=== CONTROL follower (17 plates) ===")
 ctrl_meat_h = g.PLATE_THICK_INNER - 2 * g.CLAD_THICK_INNER
-v_ctrl_plate = g.MEAT_WIDTH * ctrl_meat_h * ACTIVE_H
+v_ctrl_plate = g.MEAT_WIDTH * ctrl_meat_h * g.MEAT_HEIGHT
 v_ctrl = v_ctrl_plate * g.N_PLATES_CTRL
-print(f"  per-plate: {g.MEAT_WIDTH} x {ctrl_meat_h:.5f} x {ACTIVE_H} = {v_ctrl_plate:.5f} cm^3")
+print(f"  per-plate: {g.MEAT_WIDTH} x {ctrl_meat_h:.5f} x {g.MEAT_HEIGHT} = {v_ctrl_plate:.5f} cm^3")
 print(f"  meat volume, one ctrl follower = {v_ctrl:.5f} cm^3  [DERIVED]")
 print(f"  U-235 per ctrl follower        = {u235_mass(v_ctrl):.4f} g  [DERIVED]\n")
 
