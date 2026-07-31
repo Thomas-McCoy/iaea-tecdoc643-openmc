@@ -699,6 +699,15 @@ CTRL_BLADE_WATER = (CTRL_END_BLOCK - CTRL_FEEDER_CHANNEL
 # number against the budget instead of trusting it. The PRO-X drawing's own
 # closure (1.305 + 1.27 + 5.65 + 1.27 + 2.19 = 11.685 mm) is the same check
 # from the other end.
+#
+# Labelling (2026-07-31 spreadsheet correction): CTRL_BLADE_WATER is the
+# PER-SIDE water gap between a guide plate and the absorber. The spreadsheet
+# row "Control guide coolant channel thickness" is NOT this quantity — it is
+# the full inner span between the two guide plates that the blade rides in,
+# ABSORBER_THICK + 2*CTRL_BLADE_WATER = 0.310 + 0.255 = 0.565 (Kyle: 0.5650,
+# MATCH). 0.565 carries no assert of its own: ABSORBER_THICK is a module
+# literal and CTRL_BLADE_WATER is pinned to 0.1275 by the assert below, so
+# the span cannot move without tripping it.
 assert abs(CTRL_BLADE_WATER - 0.1275) < 1e-9, (
     f"CTRL_BLADE_WATER derives to {CTRL_BLADE_WATER:.6f}, not the 0.1275 the "
     f"2026-07-31 A3 decision quotes — the end-block budget no longer closes "
