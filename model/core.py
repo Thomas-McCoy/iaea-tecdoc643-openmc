@@ -44,6 +44,9 @@ _LOCAL_CROSS_SECTIONS = '/home/tmccoy/nuclear-data/endfb-viii.0-hdf5/cross_secti
 # CONFIG
 # =============================================================================
 
+_REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+
 @dataclass
 class CoreConfig:
     """All run knobs in one place. CLI overrides via main()."""
@@ -65,8 +68,19 @@ class CoreConfig:
     depletion_zoning: bool = False
 
     # Paths
-    output_dir: str = 'run_results/core_run'
+    #
+    # ABSOLUTE, resolved from the REPOSITORY ROOT — not the cwd. This was a
+    # relative 'run_results/core_run' until 2026-08-03, which meant a bare run
+    # wrote into whatever directory it happened to start in. On 2026-07-31 that
+    # silently overwrote the model.xml and summary.h5 of the archived production
+    # run; see model/run_results/core_run/README.md. On a cluster, where the
+    # submit script's cwd is rarely the repo, the relative form is worse still.
+    output_dir: str = str(_REPO_ROOT / 'run_results' / 'core_run')
     cross_sections: str | None = None     # None → env var, then local fallback
+
+    # Writing into a directory that already holds run output is refused
+    # unless this is set. See _prepare_output_dir().
+    overwrite_output: bool = False
 
     # Temperature treatment (materials without an explicit temperature
     # evaluate at 'default'; flux-trap water sets its own 316.8 K).
@@ -182,12 +196,45 @@ def build_model(cfg: CoreConfig) -> openmc.Model:
 # EIGENVALUE RUN
 # =============================================================================
 
+# Files a run writes that would silently misdescribe a previous run if
+# overwritten. model.xml and summary.h5 are the geometry/material description;
+# statepoint*.h5 and tallies.out are the results.
+_RUN_ARTIFACTS = ('model.xml', 'summary.h5', 'tallies.out')
+
+
+def _prepare_output_dir(cfg: CoreConfig) -> pathlib.Path:
+    """Create the output directory, refusing to clobber an existing run.
+
+    Overwriting only SOME files of a previous run is the dangerous case: it
+    leaves results beside a geometry description that does not match them, and
+    nothing errors when the two are later read together. That is exactly what
+    happened to model/run_results/core_run/ on 2026-07-31 — a build_model()
+    smoke test replaced model.xml and summary.h5 next to a statepoint from a
+    geometry nine commits older.
+    """
+    out = pathlib.Path(cfg.output_dir).resolve()
+
+    existing = [f.name for f in out.glob('*')
+                if f.name in _RUN_ARTIFACTS or f.name.startswith('statepoint')]
+    if existing and not cfg.overwrite_output:
+        raise FileExistsError(
+            f"refusing to write into a directory that already holds run output:\n"
+            f"    {out}\n"
+            f"    found: {', '.join(sorted(existing))}\n"
+            f"Overwriting only some of these leaves results beside a geometry "
+            f"description that no longer matches them, and the mismatch is "
+            f"silent. Choose a different --output-dir, or pass --overwrite-output "
+            f"if you genuinely mean to replace this run.")
+
+    out.mkdir(parents=True, exist_ok=True)
+    return out
+
+
 def run_eigenvalue(cfg: CoreConfig):
     """Build and run one eigenvalue calculation; return keff (ufloat)."""
     model = build_model(cfg)
 
-    out = pathlib.Path(cfg.output_dir)
-    out.mkdir(parents=True, exist_ok=True)
+    out = _prepare_output_dir(cfg)
 
     print(f"[core] insertion={cfg.blade_insertion_percent:.1f}% "
           f"(withdrawal f={1.0 - cfg.blade_insertion_percent / 100.0:.3f})  "
@@ -255,6 +302,9 @@ def main(argv=None):
     p.add_argument('--inactive', type=int, default=None)
     p.add_argument('--seed', type=int, default=None)
     p.add_argument('--output-dir', type=str, default=None)
+    p.add_argument('--overwrite-output', action='store_true',
+                   help='allow writing into a directory that already holds '
+                        'run output (refused by default)')
     p.add_argument('--depletion-zoning', action='store_true',
                    help='split the fuel meat into per-element, per-axial-zone '
                         'depletable materials (structural only — configures no '
@@ -276,6 +326,8 @@ def main(argv=None):
         cfg.output_dir = args.output_dir
     if args.depletion_zoning:
         cfg.depletion_zoning = True
+    if args.overwrite_output:
+        cfg.overwrite_output = True
 
     # depletion_zoning is a real run knob and prints; the other depletion_*
     # fields are unimplemented placeholders and stay hidden.

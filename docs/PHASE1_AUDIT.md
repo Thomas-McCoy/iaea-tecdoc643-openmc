@@ -32,7 +32,7 @@ Thomas's decision, and the matched-library (ENDF/B-VII.0) work has not started.
 > | 7 | `check_u235_mass.py` duplicates `MEAT_HEIGHT` | **CLOSED** — `c803e08`. |
 > | 8 | `settings.py` duplications and stale comment | **CLOSED** — `c803e08`. |
 > | 9 | Manuscript figure PDFs stale | **OPEN.** Not regenerated. |
-> | 10 | `statepoint.200.h5` predates the end-box change | **OPEN, inert.** Nothing reads it. Also carries `openmc_version 0.15.0`. |
+> | 10 | `statepoint.200.h5` predates the end-box change | **OPEN, and WORSE than the audit found.** Nothing reads it, but on 2026-08-03 it was discovered that `model.xml` and `summary.h5` in that directory were **overwritten on 2026-07-31** by a `core.build_model()` smoke test writing to `core.py`'s relative default `output_dir`. The directory is now internally inconsistent: Jul-21 results beside Jul-31 geometry. See the amendment in E4. |
 > | 11 | Non-canonical provenance tags | **PARTIAL.** `[MCNP-PROVISIONAL]` retired at `e0918c3`; the seven `[MCNP-VISUAL]` remain, pending Kyle. |
 > | 12 | `CTRL_SIDE_PLATE_X` read only by a figure table | **OPEN.** Not acted on. |
 > | 13 | Open external questions | **NOW 14** — flux-trap configuration added, see the amendment in F. |
@@ -643,6 +643,41 @@ branch since 07-21, and it predates the entire B-series and A-series besides.
 **Nothing in the repository reads from it.** No `.py` file references `run_results`,
 `statepoint`, or `core_run`. It is inert, tracked only in the sense that
 `run_results/` is `.gitignore`d (confirmed: `git ls-files` returns nothing under it).
+
+> **AMENDMENT (2026-08-03) — this directory has since been DAMAGED, and the
+> damage was self-inflicted during audit follow-up.**
+>
+> On 2026-07-31 a `core.build_model()` smoke test was run to verify the new
+> run-provenance printing. `core.py`'s `CoreConfig` carried a **relative**
+> default `output_dir = 'run_results/core_run'`, so the build wrote its
+> `model.xml` and `summary.h5` directly over the production run's copies:
+>
+> | File | Audit recorded | Now | Status |
+> |---|---|---|---|
+> | `statepoint.200.h5` | 5 690 800 B, Jul 21 14:21 | unchanged | INTACT |
+> | `tallies.out` | 3 221 099 B, Jul 21 14:21 | unchanged | INTACT |
+> | `model.xml` | 520 245 B, Jul 21 14:13 | **487 773 B, Jul 31 17:12** | **OVERWRITTEN** |
+> | `summary.h5` | 15 900 536 B, Jul 21 14:13 | **15 911 216 B, Jul 31 17:13** | **OVERWRITTEN** |
+>
+> **The directory is now internally inconsistent: a Jul-21 statepoint beside a
+> Jul-31 geometry description.** That is worse than either a clean directory or
+> an untouched stale one, because it fails SILENTLY — anyone opening
+> `summary.h5` to interpret `statepoint.200.h5` gets the wrong geometry with no
+> error and no warning.
+>
+> The overwritten files are **not recoverable from this repository**:
+> `run_results/` is `.gitignore`d and was never committed. Reconstructing the
+> true geometry description would require checking out the tree as of
+> 2026-07-21 ~14:13 and rebuilding.
+>
+> A `README.md` recording this has been placed **in the directory itself**, so
+> the warning is found by anyone who opens it rather than only by readers of
+> this audit. That README is untracked, like everything else there.
+>
+> `core.py` has since been fixed: `output_dir` resolves absolutely from the
+> repository root rather than the cwd, and writing into a non-empty directory
+> now raises unless an explicit overwrite flag is passed. Nothing in the
+> directory was deleted.
 
 Its practical significance is that it is the **only production-statistics run in the tree**,
 and the 18 853 pcm blade-worth figure in circulation derives from it. That figure therefore
