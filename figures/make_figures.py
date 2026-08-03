@@ -733,7 +733,9 @@ def write_solidworks_equations(path=None):
          "' UNITS: lengths carry an explicit cm suffix. Counts are unitless.",
          "' ORDER matters: SolidWorks resolves globals top to bottom.",
          "' " + '=' * 72, '', "' ---- lengths ----"]
-    L += [f'"{n}" = {v:.6g}cm' for n, v in SW_LENGTHS]
+    # round to 6 dp before formatting: derived constants are the end of
+    # float chains and SolidWorks should not receive 0.004999999999999893
+    L += [f'"{n}" = {round(v, 6):g}cm' for n, v in SW_LENGTHS]
     L += ['', "' ---- counts (unitless) ----"]
     L += [f'"{n}" = {v:g}' for n, v in SW_COUNTS]
     L += ['', "' ---- derived: expressions, so SolidWorks recomputes them ----"]
