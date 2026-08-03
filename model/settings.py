@@ -158,7 +158,8 @@ settings.inactive   = 50      # discard first 50 batches (source convergence)
 # OpenMC needs a starting guess for where fission neutrons come from.
 # We use a uniform spatial distribution across the active core volume.
 #
-# The core is 6 (x) x 7 (y) core positions. The FUELLED sub-block — the 28
+# The LATTICE is 6 (x) x 7 (y) = 42 positions: the 5 x 6 = 30 core positions
+# plus 12 graphite reflector positions. The FUELLED sub-block — the 28
 # standard and control elements, excluding the graphite reflector rows at the
 # top and bottom — is 6 columns wide and 5 rows tall, spanning +/-23.1 cm in x
 # and +/-20.25 cm in y. The box below covers it with margin in y:

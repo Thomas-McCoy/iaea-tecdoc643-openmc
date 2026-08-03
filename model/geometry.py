@@ -10,10 +10,15 @@ Reference:
     Appendix A-2: Generic 10 MW Reactor — Argonne National Laboratory.
 
 Core Layout:
-    - 7x6 core positions (TECDOC-643 A-2 Table 1 quotes 8x9 grid-plate
-      positions, which counts the surrounding water ring)
-    - 23 standard fuel elements, 5 control fuel elements, 2 flux traps,
-      12 graphite reflector positions = 42 = 7x6
+    - CORE: 5 x 6 = 30 positions — 23 standard fuel elements, 5 control
+      fuel elements, 2 flux traps. [TECDOC A-2 Table 1, "Active Core
+      Geometry: 5 x 6 Positions"]. The 12 graphite reflector positions are
+      NOT part of the core.
+    - LATTICE as built: 6 (x) x 7 (y) = 42 positions — the 30 core positions
+      plus the 12 graphite reflector positions, which must live in the same
+      RectLattice. This is a modelling extent, not a core description.
+    - GRID PLATE: 8 x 9 positions [TECDOC A-2 Table 1, "Grid Plate: 8 x 9
+      Positions"] — counts the surrounding water ring. Cite for that row only.
     - Lattice pitch: 77 mm x 81 mm
     - Active fuel meat height: 60 cm; plate height 62 cm
 
@@ -31,8 +36,8 @@ Axial model structure (symmetric about z=0):
     Sum check: 2 * (45 + 14 + 1 + 30) = 180 cm — tripwired below.
 
 Lateral model structure:
-    The 7x6 lattice is enclosed in an explicit water-filled pool box whose
-    lateral faces sit POOL_WATER_THICK = 38.5 cm outboard of the core
+    The 6 x 7 lattice is enclosed in an explicit water-filled pool box whose
+    lateral faces sit POOL_WATER_THICK = 38.5 cm outboard of the lattice
     envelope. Vacuum boundary at the pool faces.
         x: 6 * 7.7 + 2 * 38.5 = 123.2 cm
         y: 7 * 8.1 + 2 * 38.5 = 133.7 cm
@@ -1442,17 +1447,22 @@ graphite_univ = make_graphite_element()
 # =============================================================================
 # CORE LATTICE EXTENT AND POOL WATER BOUNDARY
 #
-# The lattice holds CORE POSITIONS ONLY — 6 (x) x 7 (y) = 42. It used to span
-# 8 x 9 including a one-cell water ring; that ring is gone and the surrounding
-# water is handled externally, as an explicit pool box.
+# The lattice holds the 30 CORE positions PLUS the 12 GRAPHITE REFLECTOR
+# positions — 6 (x) x 7 (y) = 42. It used to span 8 x 9 including a one-cell
+# water ring; that ring is gone and the surrounding water is handled
+# externally, as an explicit pool box.
+#
+# CORE_HALF_X / CORE_HALF_Y below are LATTICE half-extents. The name predates
+# this terminology and is kept because the 38.5 cm pool arithmetic and
+# tallies.py both key off it; read it as "lattice envelope", not "core".
 #
 # The ring could not simply be thickened: POOL_WATER_THICK is 5 * PITCH_X
 # exactly in x, but 38.5 / 8.1 = 4.75 in y, so no whole number of lattice rings
 # reproduces it. Hence the explicit bounding box.
 # =============================================================================
 
-N_LAT_X = 6   # core positions in x                                    [MCNP]
-N_LAT_Y = 7   # core positions in y                                    [MCNP]
+N_LAT_X = 6   # lattice positions in x (core + reflector)              [MCNP]
+N_LAT_Y = 7   # lattice positions in y (core + reflector)              [MCNP]
 
 CORE_HALF_X = N_LAT_X / 2.0 * PITCH_X     # 23.100 cm                  [DERIVED]
 CORE_HALF_Y = N_LAT_Y / 2.0 * PITCH_Y     # 28.350 cm                  [DERIVED]
@@ -1473,13 +1483,17 @@ assert abs(2 * POOL_HALF_Y - 133.7) < 1e-9, \
     f"model y-extent is {2 * POOL_HALF_Y}, expected 133.7 " \
     f"(7 x {PITCH_Y} + 2 x {POOL_WATER_THICK})"
 assert abs((POOL_HALF_X - CORE_HALF_X) - POOL_WATER_THICK) < 1e-12, \
-    "pool x-face is not POOL_WATER_THICK outboard of the core envelope"
+    "pool x-face is not POOL_WATER_THICK outboard of the lattice envelope"
 assert abs((POOL_HALF_Y - CORE_HALF_Y) - POOL_WATER_THICK) < 1e-12, \
-    "pool y-face is not POOL_WATER_THICK outboard of the core envelope"
+    "pool y-face is not POOL_WATER_THICK outboard of the lattice envelope"
 
 
 # =============================================================================
-# CORE MAP — position labels for the 7x6 core
+# CORE MAP — position labels for the 6 (x) x 7 (y) LATTICE
+#
+# This map covers the LATTICE, not the core. The core is 5 x 6 = 30 positions
+# (23 standard + 5 control + 2 flux traps); the two all-graphite rows are
+# reflector, not core, and bring the lattice to 6 x 7 = 42.
 #
 # Token grid mirroring lattice_universes below, one token per CORE position:
 #   'S' standard fuel   'C' control fuel   'F' flux trap   'G' graphite
@@ -1492,8 +1506,9 @@ assert abs((POOL_HALF_Y - CORE_HALF_Y) - POOL_WATER_THICK) < 1e-12, \
 # channels — "1 at Core Center" and "1 at Core Edge" (A-2 §1: one water-filled
 # flux trap near the center of the core, another near an edge). The literal
 # below places them at D4 (center) and A6 (edge), which is the benchmark
-# configuration. The 8x9 figure is the grid plate INCLUDING the surrounding
-# water ring; the 42 core positions modelled here are 7x6.
+# configuration. Table 1's 8 x 9 is the GRID PLATE row, which counts the
+# surrounding water ring; its 5 x 6 is the ACTIVE CORE row. The 42 positions
+# modelled here are the 6 x 7 lattice = 30 core + 12 graphite reflector.
 #
 # Columns A-F run left to right in +x; rows 1-7 run top to bottom, so ROW 1 IS
 # THE +y EDGE — matching the array order of CORE_MAP and lattice_universes, so
@@ -1518,10 +1533,10 @@ CORE_MAP = [
 
 
 def core_map_label(row, col):
-    """Position label for core position (row, col), or None outside the 7x6.
+    """Label for lattice position (row, col), or None outside the 6 x 7.
 
     Re-indexed in B4 when the surrounding water ring left the lattice: the map
-    is now core positions only, so row/col are 0-based over the core itself
+    is now lattice positions only, so row/col are 0-based over the lattice
     rather than offset by the ring. The LABELS THEMSELVES ARE UNCHANGED
     (A1..F7) — they name depletion materials, and a silent shift would
     re-point every zoned material at a different element.
@@ -1550,7 +1565,7 @@ assert len(CORE_MAP) == N_LAT_Y, \
 assert all(len(r) == N_LAT_X for r in CORE_MAP), \
     f"every CORE_MAP row must have N_LAT_X={N_LAT_X} entries"
 assert not any('W' in r for r in CORE_MAP), \
-    "CORE_MAP must hold core positions only — the water ring left the lattice in B4"
+    "CORE_MAP must hold lattice positions only — the water ring left the lattice in B4"
 assert len(STD_ELEMENT_IDS) == 23, \
     f"CORE_MAP has {len(STD_ELEMENT_IDS)} 'S' positions, expected 23"
 assert len(CTRL_ELEMENT_IDS) == 5, \
@@ -1560,9 +1575,9 @@ assert sum(r.count('F') for r in CORE_MAP) == 2, \
 assert sum(r.count('G') for r in CORE_MAP) == 12, \
     "CORE_MAP must have exactly 12 graphite reflector positions"
 assert sum(len(r) for r in CORE_MAP) == 42 == N_LAT_X * N_LAT_Y, \
-    "core positions must total 42 = 7x6"
+    "lattice positions must total 42 = 6 x 7 (30 core + 12 graphite reflector)"
 assert None not in STD_ELEMENT_IDS + CTRL_ELEMENT_IDS, \
-    "a fuelled position fell outside the labelled 7x6 core"
+    "a fuelled position fell outside the labelled 6 x 7 lattice"
 assert len(set(STD_ELEMENT_IDS + CTRL_ELEMENT_IDS)) == 28, \
     "duplicate core-map labels"
 
@@ -1598,7 +1613,7 @@ def build_core_geometry(withdrawn_fraction=1.0, depletion_zoning=False):
     move. With it off the model is byte-for-byte what it has always been.
 
     This is the single construction path used by core.build_model() and all
-    run/ drivers. The 7x6 lattice sits inside a water-filled pool box whose
+    run/ drivers. The 6 x 7 lattice sits inside a water-filled pool box whose
     lateral faces are POOL_WATER_THICK = 38.5 cm outboard of the core envelope;
     the vacuum boundary is there, not at the lattice edge. Vacuum at
     CORE_BOTTOM=-90 / CORE_TOP=+90 accommodates the full axial stack

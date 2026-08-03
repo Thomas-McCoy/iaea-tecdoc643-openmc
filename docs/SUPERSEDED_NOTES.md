@@ -215,9 +215,9 @@ Only contradictions **not** already covered there are listed.
 - **z = −65 / +95 was already superseded** by Testament II T2.1 to ∓90, which is
   still correct.
 
-Note on terminology: 8×9 is the TECDOC-643 A-2 Table 1 *grid plate* count, which
-includes the surrounding water ring. Cite it only in that context; the modelled
-core is 7×6.
+Note on terminology: see §6 — 8×9 is Table 1's *grid plate* row, 5×6 is its
+*active core* row, and 6×7 is the lattice this model builds. All three are
+correct for different things.
 
 **What survives:** pitch 7.7 × 8.1, and `lattice.outer = water_univ` — kept as
 roundoff insurance.
@@ -393,6 +393,52 @@ Testament II T2.7 replaced the old `cp model/*.py` runbook with a whole-tree
 rsync after the 7/20 stray-file incident. A whole-tree rsync will copy `docs/`
 unless told otherwise — that is precisely the failure mode this list exists to
 prevent.
+
+---
+
+## 6. Core / lattice / grid plate — three counts, all correct
+
+**Do not reconcile these by "correcting" one.** They describe three different
+things, and two of them are direct quotes from TECDOC-643 A-2 Table 1.
+
+| Count | What it is | Source |
+|---|---|---|
+| **5 × 6 = 30** | **THE CORE.** 23 standard + 5 control + 2 flux traps. **Excludes the 12 graphite reflector positions, which are not core.** | `[TECDOC A-2 Table 1, "Active Core Geometry: 5 x 6 Positions"]` |
+| **6 (x) × 7 (y) = 42** | **THE LATTICE AS BUILT.** The 30 core positions **plus** the 12 graphite reflector positions, which must live in the same `RectLattice`. A modelling extent, not a core description. | this model — `N_LAT_X`, `N_LAT_Y` |
+| **8 × 9 = 72** | **THE GRID PLATE.** Counts the surrounding water ring. | `[TECDOC A-2 Table 1, "Grid Plate: 8 x 9 Positions"]` |
+
+Arithmetic, verified against `CORE_MAP` at HEAD: the two all-graphite rows are
+12 positions; the remaining 5 rows × 6 columns are 30, and 23 + 5 + 2 = 30
+exactly. 30 + 12 = 42 = 6 × 7.
+
+**Rules.**
+
+- **The core is 5 × 6.** Describe it that way in prose, comments, docstrings and
+  commit messages.
+- **Never call the core 7 × 6.** That phrasing was used throughout this project
+  until 2026-07-31 and is wrong: it transposes the lattice and calls a
+  core-plus-reflector extent "the core". Every prose occurrence has been
+  corrected; `grep -rniE '7x6|7 x 6'` should return nothing.
+- **The lattice is 6 × 7, and say "lattice" when you mean it.** `N_LAT_X = 6`,
+  `N_LAT_Y = 7`, `CORE_HALF_X = 23.100`, `CORE_HALF_Y = 28.350` are **unchanged
+  and must stay so** — the 38.5 cm pool arithmetic (123.200 × 133.700) and
+  `tallies.py`'s flux mesh both key off them. This is a naming correction only.
+- **Cite 8 × 9 for the grid-plate row only.**
+
+**One name kept despite being wrong.** `CORE_HALF_X` / `CORE_HALF_Y` are
+**lattice** half-extents, not core half-extents — the core is smaller in y by one
+reflector row at each end. The names predate this terminology and are retained
+because renaming them would touch `tallies.py`, `check_depletion_zoning.py` and
+the pool derivation for no physical gain. An in-code comment at the definition
+says to read them as "lattice envelope". Flagged here so the inconsistency is
+recorded rather than discovered.
+
+**Open, for Kyle — do not guess.** The cross-validation spreadsheet's "Grid
+plate positions" row reads **OpenMC 8 × 9 vs MCNP 7 × 6**. Under this
+terminology *neither entry is obviously right*: 8 × 9 is the TECDOC grid-plate
+figure rather than anything either model builds, and 7 × 6 is the transposed
+lattice under the very naming this section retires. The row needs Kyle, not an
+edit.
 
 ---
 

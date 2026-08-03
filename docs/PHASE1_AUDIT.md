@@ -148,7 +148,7 @@ that read the name; `geometry.py` itself is omitted where it is the only reader.
 | `POOL_HALF_X` | 1367 | 61.6 | `[DERIVED]` | `CORE_HALF_X + POOL_WATER_THICK` | make_phase1_xs_plots |
 | `POOL_HALF_Y` | 1368 | 66.85 | `[DERIVED]` | `CORE_HALF_Y + POOL_WATER_THICK` | make_phase1_xs_plots |
 | `CORE_MAP_COLS` | 1412 | 'ABCDEF' | `[TECDOC]`¹ | primary | make_figures |
-| `CORE_MAP` | 1413 | 7×6 tokens | **none** | primary | make_figures, plot_core, check_depletion_zoning |
+| `CORE_MAP` | 1413 | 6×7 lattice tokens | **none** | primary | make_figures, plot_core, check_depletion_zoning |
 | `STD_ELEMENT_IDS` / `CTRL_ELEMENT_IDS` | 1449–1450 | 23 / 5 labels | **none** | from `CORE_MAP` | check_depletion_zoning |
 
 ¹ The `[TECDOC]` near `CORE_MAP_COLS` is picked up from the surrounding block comment, which

@@ -297,7 +297,8 @@ check("zone cells span exactly [MEAT_BOT_Z, MEAT_TOP_Z]",
 print("\n=== 6. Coordinate probes ===")
 
 _NROWS = len(g.CORE_MAP)
-# Lattice lower_left. Derived from the core envelope, never hardcoded: this
+# Lattice lower_left. Derived from the lattice envelope (CORE_HALF_X/Y are
+# lattice half-extents despite the name), never hardcoded: this
 # was -4.0*PITCH_X, -4.5*PITCH_Y — the extent of the pre-B4 8x9 lattice
 # including its water ring. After B4 reduced the lattice to the 6x7 core
 # positions, that put every probe a full pitch cell off, so the zone-ordering
