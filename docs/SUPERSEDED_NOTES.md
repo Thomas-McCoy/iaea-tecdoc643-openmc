@@ -320,10 +320,48 @@ The only reason this one surfaced is that someone read both documents against th
 code at the same time, which had not happened in eleven days.
 
 The practical rule: **when a summary and an older source disagree, check the
-code before assuming the summary is right.** And a supersession document should
-supersede *claim by claim*, not wholesale — T2.1's table does this correctly for
-the eleven rows it lists, and the failure is in T2.5, which restated geometry
-from scratch rather than diffing it.
+code before assuming the summary is right.**
+
+### 4.3 — The generalization: T2.5 RESTATED where T2.1 CITED
+
+**The same document contains both the safe pattern and the failing one.** That
+is what makes this worth stating as a rule rather than an anecdote.
+
+**T2.1 CITES.** Its supersession table is two columns — the original claim, and
+what replaces it. Every row names what it is overriding:
+
+> | §5: axial model z = [−65, +95] | **z = [−90, +90]**, symmetric about z = 0 … |
+> | §6: graphite 1.70 g/cm³ | **1.7000 g/cm³ [TECDOC]**, per 7/20 meeting … |
+
+A row like that **cannot silently regress.** To get it wrong you have to
+misstate a claim you are looking directly at, and a reader can check the pairing
+without leaving the page. All eleven rows survived.
+
+**T2.5 RESTATES.** It re-derives the geometry from scratch, in prose, with no
+reference to what it supersedes:
+
+> "**Graphite reflector:** continuous in-plane wall (full pitch) in the active
+> z-range … **Inter-block water channels pending the MCNP dimension.**"
+
+Nothing in that sentence points at Bible §5. The reader has no signal that an
+earlier, better statement exists, and the writer had no forcing function to
+check one. The correct fact was not contradicted — **it was simply not carried
+forward**, and its absence is invisible.
+
+**Operational rule for any future summary document:**
+
+> **Cite claims to their source; do not restate them.**
+>
+> `graphite block 7.6 × 8.0 [Bible §5]` is checkable and cannot regress
+> silently. `graphite is a continuous wall, channel dimension pending` is a
+> fresh assertion wearing a summary's authority, and nothing in the process
+> distinguishes the two.
+
+This applies directly to the document you are reading. Every entry above names
+the commit that superseded the claim, and quotes the superseded text verbatim,
+for exactly this reason — so a future reader can verify the pairing rather than
+trust it, and so a wrong entry here fails visibly instead of quietly replacing
+something correct.
 
 ---
 
