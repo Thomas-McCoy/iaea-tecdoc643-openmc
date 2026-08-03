@@ -105,11 +105,59 @@ def build_plots():
     return openmc.Plots([p1, p2, p3, p4])
 
 
+def stamp(png_path, text):
+    """Burn a provenance line into the bottom-left corner of a PNG.
+
+    plots/ is no longer tracked (4a76220), so a PNG on disk has no version
+    control and no way to say which geometry it depicts. That is exactly how
+    twelve plots of a superseded model sat in the repository for four days and
+    became finding #2 of the Phase 1 audit. A SHA in the corner makes staleness
+    self-evident to anyone looking at the file, with no repository access.
+
+    Verification plots only. figures/make_figures.py output is NOT stamped —
+    manuscript figures keep clean margins.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+    with Image.open(png_path) as im:
+        im = im.convert('RGB')
+        d = ImageDraw.Draw(im)
+        # Font scales with the image: these panels run from 700 px to 2400 px
+        # wide, and a fixed 11 px default would be invisible on the large ones.
+        size = max(11, im.width // 60)
+        try:
+            font = ImageFont.load_default(size=size)
+        except TypeError:          # Pillow < 9.2 has no size argument
+            font = ImageFont.load_default()
+        pad = max(6, im.width // 100)
+        halo = max(1, size // 8)
+        x, y = pad, im.height - pad - size
+        # Two passes: white halo then black text, so the stamp stays legible
+        # over either the dark B4C or the light aluminium.
+        for dx in (-halo, 0, halo):
+            for dy in (-halo, 0, halo):
+                if dx or dy:
+                    d.text((x + dx, y + dy), text, font=font, fill=(255, 255, 255))
+        d.text((x, y), text, font=font, fill=(0, 0, 0))
+        im.save(png_path)
+
+
 if __name__ == '__main__':
+    from settings import run_provenance
+
+    # Primed at run start, before the build — same rule as core.build_model().
+    prov = run_provenance()
+    stamp_text = (f"{prov['git']} | openmc {prov['openmc_version']} | "
+                  f"{prov['utc'][:10]} | f={WITHDRAWN_FRACTION}")
+
     geom = g.build_core_geometry(withdrawn_fraction=WITHDRAWN_FRACTION)
     model = openmc.Model(geometry=geom, materials=materials,
                          plots=build_plots())
     model.plot_geometry(cwd=OUT_DIR)
+
+    for p in build_plots():
+        stamp(os.path.join(OUT_DIR, f'{p.filename}.png'), stamp_text)
+
     print(f"\nWrote 4 verification plots to {OUT_DIR} "
           f"(f = {WITHDRAWN_FRACTION}, blades "
           f"{'inserted' if WITHDRAWN_FRACTION == 0.0 else 'withdrawn'})")
+    print(f"  stamped: {stamp_text}")

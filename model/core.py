@@ -103,6 +103,18 @@ def build_model(cfg: CoreConfig) -> openmc.Model:
     """Assemble materials + geometry + settings + tallies into one Model."""
     resolve_cross_sections(cfg)
 
+    # Run provenance is PRIMED HERE, AT RUN START — deliberately, and this must
+    # not drift to the point where results are written. run_provenance() caches
+    # on first call, so whichever call comes first fixes the recorded state. A
+    # long cluster run that captured its tree state at result-write would record
+    # the working tree hours after the run began, and a commit landing mid-run
+    # would stamp the results with a SHA that never produced them. Capturing at
+    # build time means the recorded SHA is the code that built the model.
+    from settings import run_provenance, format_provenance
+    run_provenance()          # prime the cache before anything else runs
+    print("Run provenance (captured at model build):")
+    print(format_provenance())
+
     # CRITICAL direction conversion — geometry uses WITHDRAWAL fraction
     # (f=0 fully inserted, f=1 fully withdrawn); cfg uses INSERTION percent
     # (0 withdrawn, 100 inserted). These are opposite senses:

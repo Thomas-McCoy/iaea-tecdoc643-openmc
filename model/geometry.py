@@ -1936,6 +1936,16 @@ def _run_blade_slot_checks(geom, f):
 
 
 if __name__ == '__main__':
+    # Provenance first, so every verification result below is stamped with the
+    # code that produced it. This is the H3 gap from the Phase 1 audit: a stale
+    # verification read used to be invisible in the output and had to be
+    # inferred afterwards. A '-dirty' suffix here means the asserts and overlap
+    # checks below did NOT run against a committed tree.
+    from settings import format_provenance as _fmt_prov
+    print("Run provenance:")
+    print(_fmt_prov())
+    print()
+
     geometry.export_to_xml()
     print("geometry.xml written successfully.\n")
     print(f"Lattice pitch:        {PITCH_X} x {PITCH_Y} cm")
