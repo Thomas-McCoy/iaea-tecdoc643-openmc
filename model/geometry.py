@@ -81,20 +81,25 @@ from materials import (fuel, clad, water, water_core, b4c, graphite, aluminum,
 # LATTICE / ELEMENT ENVELOPE
 # =============================================================================
 
-PITCH_X = 7.7    # cm  (77 mm)   lattice pitch          [TECDOC] (MCNP MATCH)
-PITCH_Y = 8.1    # cm  (81 mm)   lattice pitch          [TECDOC] (MCNP MATCH)
+# Lattice pitch. NOTE THE SUBSECTION: this is the only geometry constant that
+# comes from Table 1's REACTOR Design Description rather than its Fuel Element
+# Design Descriptions. [TECDOC A-2 Table 1, Reactor Design Description] (MCNP MATCH)
+PITCH_X = 7.7    # cm  (77 mm)
+PITCH_Y = 8.1    # cm  (81 mm)
 
-ELEM_X = 7.6     # cm  (76 mm)   element envelope       [TECDOC] (MCNP MATCH)
-ELEM_Y = 8.0     # cm  (80 mm)   element envelope; also [TECDOC] (MCNP MATCH)
-                 #                the side plate width (8.000)
+# Element envelope, 76 x 80 mm. ELEM_Y is also the side plate width (8.000).
+# [TECDOC A-2 Table 1, Fuel Element Design Descriptions, LEU column] (MCNP MATCH)
+ELEM_X = 7.6     # cm  (76 mm)
+ELEM_Y = 8.0     # cm  (80 mm)
 
 # --- Axial plate / meat heights ---------------------------------------------
 # The reference MCNP model carries 1 cm of UNFUELED cladding above and below
 # the active meat: the plates stand 62 cm tall with 60 cm of meat inside them.
 # MEAT_HEIGHT and PLATE_HEIGHT are INDEPENDENT primaries; the clad extension is
 # derived from the pair and is never written as a literal anywhere.
-MEAT_HEIGHT  = 60.0   # cm (600 mm) — active fuel meat height  [TECDOC] (MCNP MATCH)
-                      # completes the meat block: 0.051 x 6.300 x 60.000
+MEAT_HEIGHT  = 60.0   # cm (600 mm) — active fuel meat height
+                      # completes the meat block 0.51 x 63 x 600 mm
+                      # [TECDOC A-2 Table 1, Fuel Element] (MCNP MATCH)
 PLATE_HEIGHT = 62.0   # cm (620 mm) — fuel / unfueled plate height   [MCNP]
 CLAD_EXT     = (PLATE_HEIGHT - MEAT_HEIGHT) / 2.0   # 1.0 cm          [DERIVED]
 
@@ -102,6 +107,12 @@ assert CLAD_EXT > 0, "PLATE_HEIGHT must exceed MEAT_HEIGHT (clad extension <= 0)
 
 # Element dimension (Z). Side plates, unfueled control plates, flux-trap blocks
 # and reflector blocks all run the full plate height, not the meat height.
+#
+# KNOWN TECDOC / MCNP DIVERGENCE, MCNP GOVERNS. TECDOC-643 A-2 Table 1 gives
+# the element dimension as 600 mm; this model carries 620 mm on Kyle's
+# confirmation (B1), because the reference MCNP model adds 1 cm of unfueled
+# cladding at each end. The divergence is deliberate and is recorded here so
+# it stays visible rather than silently contradicting the benchmark.
 ELEM_Z = PLATE_HEIGHT   # 62.0 cm                                     [MCNP]
 
 # Inter-element water gap — documentation/tripwire only. Feeds no surface or
@@ -134,7 +145,12 @@ assert abs((PITCH_X - REFL_BLOCK_X) / 2.0 - GAP_X) < 1e-12, \
 assert abs((PITCH_Y - REFL_BLOCK_Y) / 2.0 - GAP_Y) < 1e-12, \
     "reflector block does not leave the standard inter-element gap in y"
 
-SIDE_PLATE_THICK = 0.48   # cm (4.8 mm) side plate      [TECDOC] (MCNP MATCH)
+# Side plate thickness. NOT in Table 1 — it comes from the dimensioned drawing
+# in Fig. 2's TOP-LEFT panel. The other three panels of Fig. 2 are homogenized
+# diffusion models, not physical geometry, and are not authoritative for any
+# dimension. Cite the panel, never Fig. 2 generally.
+# [TECDOC A-2 Fig. 2 top-left] (MCNP MATCH)
+SIDE_PLATE_THICK = 0.48   # cm (4.8 mm)
 
 # Interior coolant channel width — the clear span between the side plates.
 # 6.640, a MATCH row, and NOT the absorber blade width (see ABSORBER_WIDTH).
@@ -144,13 +160,16 @@ ACTIVE_STACK_X   = ELEM_X - 2 * SIDE_PLATE_THICK   # 6.64 cm        [DERIVED]
 # PLATE / MEAT / CLAD DIMENSIONS
 # =============================================================================
 
-PLATE_THICK_INNER = 0.127    # cm (1.27 mm) inner plate [TECDOC] (MCNP MATCH)
+# Plate, clad and meat cross-section. Table 1 gives plate 1.27 mm, clad
+# 0.38 mm inner / 0.495 mm outer, meat 0.51 x 63 x 600 mm.
+# [TECDOC A-2 Table 1, Fuel Element Design Descriptions, LEU column] (MCNP MATCH)
+PLATE_THICK_INNER = 0.127    # cm (1.27 mm)  inner plate
 
-CLAD_THICK_INNER = 0.038     # cm (0.38 mm)  inner clad  [TECDOC] (MCNP MATCH)
-CLAD_THICK_OUTER = 0.0495    # cm (0.495 mm) outer clad  [TECDOC] (MCNP MATCH)
+CLAD_THICK_INNER = 0.038     # cm (0.38 mm)  inner clad
+CLAD_THICK_OUTER = 0.0495    # cm (0.495 mm) outer clad
 
-MEAT_THICK = 0.051           # cm (0.51 mm) meat thick   [TECDOC] (MCNP MATCH)
-MEAT_WIDTH = 6.3             # cm (63 mm)   meat width   [TECDOC] (MCNP MATCH)
+MEAT_THICK = 0.051           # cm (0.51 mm)  meat thickness
+MEAT_WIDTH = 6.3             # cm (63 mm)    meat width
 
 # Outer plates (first/last in the stack) are clad at the outer thickness on
 # BOTH faces of the meat, not just the face away from the stack — so their
@@ -158,11 +177,14 @@ MEAT_WIDTH = 6.3             # cm (63 mm)   meat width   [TECDOC] (MCNP MATCH)
 PLATE_THICK_OUTER = MEAT_THICK + 2 * CLAD_THICK_OUTER   # 0.15 cm  [DERIVED]
                                                         # (1.5 mm, MCNP MATCH)
 
-N_PLATES_STD  = 23           # fuel plates per standard element  [TECDOC]
-N_PLATES_CTRL = 17           # fuel plates per control element   [TECDOC]
+# Plate counts. Table 1: 23 plates per standard element, "17 + 4 Al plates"
+# per control element. [TECDOC A-2 Table 1, Fuel Element] (MCNP MATCH)
+N_PLATES_STD  = 23           # fuel plates per standard element
+N_PLATES_CTRL = 17           # fuel plates per control element
 
-# Interior coolant channel, plate to plate.
-WATER_CHAN_THICK = 0.219     # cm (2.19 mm)             [TECDOC] (MCNP MATCH)
+# Interior coolant channel, plate to plate. Table 1 gives 2.19 mm.
+# [TECDOC A-2 Table 1, Fuel Element] (MCNP MATCH)
+WATER_CHAN_THICK = 0.219     # cm (2.19 mm)
 
 # Standard element plate-stack height and the residual end water gap between
 # the outermost plate face and the element envelope edge. [DERIVED]
@@ -692,6 +714,11 @@ assert abs(ABSORBER_THICK - 0.310) < 1e-12, (
 # x-extent straight from CTRL_FUEL_WIDTH_X (= ACTIVE_STACK_X), so the blade was
 # 6.640 wide by construction and there was no way to move one without the other.
 # They are now independent, and the assert below stops them being re-merged.
+#
+# KNOWN TECDOC / MCNP DIVERGENCE, MCNP GOVERNS. TECDOC-643 A-2 Fig. 2's
+# bottom-right panel shows 6.60; the reference MCNP model gives 6.630 (B3),
+# and ACTIVE_STACK_X is a third value again at 6.640. Three different numbers
+# for adjacent quantities — recorded so the divergence stays visible.
 ABSORBER_WIDTH  = 6.63   # cm                                          [MCNP]
 
 # The blade is narrower than the slot it sits in, so a thin water film runs
@@ -710,7 +737,9 @@ CTRL_FUEL_WIDTH_X   = ACTIVE_STACK_X
 CTRL_SIDE_PLATE_X   = SIDE_PLATE_THICK
 # Unfueled (control-element) plate thickness. B5: ours is the CORRECT side —
 # the MCNP model's 0.150 is being corrected there. Do not change this to match.
-CTRL_AL_PLATE_THICK = 0.127   # cm (1.27 mm) [TECDOC] — was 0.15 (an Argonne
+# [TECDOC A-2 Table 1, Fuel Element] — the "4 Al plates" of the control
+# element's "17 + 4" row, at the same 1.27 mm as the fuel plates.
+CTRL_AL_PLATE_THICK = 0.127   # cm (1.27 mm) — was 0.15 (an Argonne
                               # TH-analysis convenience); reverted 2026-07-20.
 # CTRL_HF_THICK removed 2026-07-31: a dead Hf-era alias of ABSORBER_THICK,
 # defined but never read anywhere in the repository. Use ABSORBER_THICK (y) and
