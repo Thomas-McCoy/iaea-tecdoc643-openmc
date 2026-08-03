@@ -110,7 +110,7 @@ from geometry import (
     N_CTRL_FUEL_PLATES, CTRL_PLATE_PITCH, CTRL_FUEL_STACK_HALF,
     CTRL_FUEL_WIDTH_X, CTRL_SIDE_PLATE_X, CTRL_AL_PLATE_THICK,
     CTRL_FEEDER_CHANNEL, CTRL_BLADE_WATER, CTRL_OUTER_OFFSET,
-    CTRL_END_BLOCK, ABSORBER_THICK,
+    CTRL_END_BLOCK, ABSORBER_THICK, ABSORBER_WIDTH, BLADE_TOP_CLAD,
     HALF_Z, HALF_PLATE_Z, PLATE_HEIGHT, MEAT_HEIGHT, CLAD_EXT, ENDBOX_HEIGHT,
     CORE_TOP, CORE_BOTTOM, ENDBOX_ABOVE_TOP, ENDBOX_BELOW_BOT,
     BLADE_LENGTH, ROD_TRAVEL,
@@ -680,6 +680,21 @@ SW_LENGTHS = [
     ('ENDBOX_ABOVE_TOP', ENDBOX_ABOVE_TOP),
     ('ENDBOX_BELOW_BOT', ENDBOX_BELOW_BOT), ('BLADE_LENGTH', BLADE_LENGTH),
     ('ROD_TRAVEL', ROD_TRAVEL),
+    # --- axial build-up, added 2026-08-03 -----------------------------------
+    # The plate is 62 tall with 60 of meat inside it; the 1 cm difference at
+    # each end is unfueled cladding, and the end-box picks up at 31.
+    ('PLATE_HEIGHT', PLATE_HEIGHT),      # full plate height, incl. clad extension
+    ('MEAT_HEIGHT', MEAT_HEIGHT),        # active fuel meat only
+    ('CLAD_EXT', CLAD_EXT),              # unfueled clad above AND below the meat
+    ('ENDBOX_HEIGHT', ENDBOX_HEIGHT),    # homogenized end-box, runs 31 -> 45
+    # --- absorber blade ------------------------------------------------------
+    # ABSORBER_WIDTH is the B4C blade itself. It is NOT the coolant channel
+    # width, which is ACTIVE_STACK_X = 6.64 above — a separate constant that
+    # this one was aliased to until B3. The blade is narrower than the slot it
+    # rides in; the 0.005 per side is water.
+    ('ABSORBER_WIDTH', ABSORBER_WIDTH),  # B4C blade width (channel is 6.64)
+    ('BLADE_TOP_CLAD', BLADE_TOP_CLAD),  # Al cap, TOP END ONLY — no side or
+                                         # bottom clad, absent by confirmation
 ]
 SW_COUNTS = [('N_PLATES_STD', N_PLATES_STD),
              ('N_CTRL_FUEL_PLATES', N_CTRL_FUEL_PLATES)]
