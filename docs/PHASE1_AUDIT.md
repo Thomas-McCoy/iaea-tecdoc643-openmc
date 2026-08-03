@@ -26,7 +26,7 @@ Thomas's decision, and the matched-library (ENDF/B-VII.0) work has not started.
 > | 1 | Deliverable repo serves the pre-Phase-1 model | **OPEN — Thomas's action.** Unchanged. |
 > | 2 | 12 tracked stale plots | **CLOSED** — `d74f158` untracked them and removed the `!plots/*.png` exception; `4a76220` untracked the remaining four. `plots/` now tracks nothing. |
 > | 3 | `run_vii_mat.py` builds a different model | **OPEN — VII.0 blocker.** Rewrite (import from `materials.py`, override only the library switch) agreed, not started. |
-> | 4 | Spreadsheet not on this machine | **AMENDED, not closed.** It is at `/mnt/c/…` — a WSL mount outside the search path. **Twelve copies**, none in version control, canonical copy unclear. Thomas is committing a CSV export to `docs/`. Section G stays un-auditable until then. |
+> | 4 | Spreadsheet not on this machine | **SEVERITY REDUCED, NOT CLOSED.** Located at `/mnt/c/…` — a WSL mount outside the search path. **Twelve copies**, none in version control, canonical copy unclear. `2c50e9c` adds the first validation that does NOT route through it — three asserts against TECDOC-643 A-2 Table 1 covering fissile inventory, uranium density and enrichment — so the model is no longer *wholly* dependent on an unversioned document. **But the spreadsheet remains the sole authority for every other constant**, and Section G stays un-auditable until a CSV export is committed. |
 > | 5 | Four `[MCNP]` tags are structural aliases | **AMENDED — see the note appended to C3.** Better supported than credited. Tags unchanged. |
 > | 6 | `ABSORBER_THICK` untagged and unasserted | **CLOSED** — `e7f85be` tagged it `[MCNP]`, `0574cff` pinned it. |
 > | 7 | `check_u235_mass.py` duplicates `MEAT_HEIGHT` | **CLOSED** — `c803e08`. |
