@@ -96,6 +96,7 @@ from geometry import (
     MEAT_BOT_Z, MEAT_TOP_Z, MEAT_ZONE_HEIGHT,
     MEAT_LEFT_X, MEAT_RIGHT_X, MEAT_ZONE_WIDTH,
     N_PLATES_STD, N_CTRL_FUEL_PLATES, CTRL_ELEMENT_IDS,
+    CORE_HALF_X, CORE_HALF_Y,
 )
 from materials import (
     fuel, clad, water, water_core, b4c, graphite, aluminum, end_box_homog,
@@ -504,7 +505,19 @@ def build_zone_colors(mode):
 
 # ── Slice locations, derived from the core map ───────────────────────────────
 
-_LL_X, _LL_Y = -4.0 * PITCH_X, -4.5 * PITCH_Y
+# Lattice lower_left, DERIVED from the lattice envelope (CORE_HALF_X/Y are
+# lattice half-extents despite the name), never hardcoded.
+#
+# This was `-4.0 * PITCH_X, -4.5 * PITCH_Y` until 2026-08-12 — the extent of the
+# pre-B4 8x9 lattice INCLUDING its water ring. B4 reduced the lattice to the 6x7
+# core positions, which left this origin exactly ONE PITCH CELL off in both x
+# and y (30.8 vs 23.1; 36.45 vs 28.35). Every slice location derived from it —
+# the XZ/YZ slices, the XY zoom block, the row panels, the x zone annotations —
+# was therefore a full element out of position, and probe_slice_locations()
+# refused to plot because the slices landed in water and graphite instead of
+# fuel meat. The identical fix was applied to check_depletion_zoning.py when B4
+# landed; plot_core.py was missed, and has been unable to regenerate since.
+_LL_X, _LL_Y = -CORE_HALF_X, -CORE_HALF_Y
 _NROWS = len(CORE_MAP)
 
 
