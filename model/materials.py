@@ -352,10 +352,35 @@ if USE_AL_SAB:
 # Anyone proposing a resolution study needs to see this before proposing it.
 #
 # (1) TRANSPORT. A standard element universe holds 460 meat cells at 2 x 10
-# against ~110 in the unzoned model. OpenMC searches cells within a universe
-# linearly, so that ~4x is paid on EVERY neutron boundary crossing inside an
-# element. ALL MEASURED 2026-08-12; the geometry_debug overlap scan at f=0.5 is
-# the only transport-side signal so far:
+# against ~110 in the unzoned model.
+#
+# HOW OPENMC ACTUALLY FINDS CELLS — corrected 2026-08-12. An earlier version of
+# this block said OpenMC "searches cells within a universe linearly, so that ~4x
+# is paid on EVERY neutron boundary crossing". THAT WAS WRONG AS STATED, and it
+# overstated the transport cost of raising the zone counts. Per OpenMC's Theory
+# and Methodology documentation:
+#   * Finding a cell from a point (Sec. 2.3) IS a linear loop over a universe's
+#     cells, recursing into filled universes. That much was right.
+#   * A SURFACE CROSSING (Sec. 2.6) — the common case in transport — searches
+#     only that surface's NEIGHBOR LIST. The full linear search is the FALLBACK
+#     when the neighbor-list search misses.
+#   * Neighbor lists (Sec. 2.7) are CELL-BASED as of OpenMC 0.11 and are built
+#     dynamically during transport. OpenMC moved off surface-based lists because
+#     those degrade when one surface bounds many cells — exactly what zoning
+#     creates, since each shared interior zone plane bounds two cells in all 614
+#     plates.
+#   * Harper, Romano, Forget, Smith, Nucl. Sci. Eng.,
+#     doi 10.1080/00295639.2020.1719765
+# So per-universe cell count is NOT paid in full on every boundary crossing.
+#
+# READ THE SCAN COLUMN ACCORDINGLY. geometry_debug locates points from scratch
+# to check for overlaps, which is the unmitigated Sec. 2.3 path — precisely what
+# neighbor lists bypass in real transport. The scan is therefore a WORST CASE
+# and an UPPER BOUND on the geometry-search term, NOT a transport predictor.
+# No transport penalty has been measured and none is estimated here; doing that
+# requires an eigenvalue run, which has never been performed on this model.
+#
+# ALL MEASURED 2026-08-12:
 #
 #          zones    cells     mats   build   geometry.xml  materials.xml  scan
 #  unzoned     -      614        1  0.08 s        0.47 MB      0.002 MB   3.4 s
