@@ -422,7 +422,16 @@ bookkeeping.
 - Al MT card — he will add Al S(α,β) in his own time; the OpenMC side already has it. **Until both have it, a comparison is a known method difference, not a matched configuration**
 - Whether the reference k-eff targets were themselves checked for source convergence
 - Outer-pool water H-1 / O-16: 6.669090E-02 vs 6.673560E-02, 0.067% against a 0.010% tolerance, no decision on record. **This matters more since B4** — that material now fills the entire 38.5 cm pool rather than a thin ring
-- Depletion zoning — the seven `[MCNP-VISUAL]` claims (5 axial zones x 12 cm, 140 regions), read visually off a zx slice
+- ~~Depletion zoning — the seven `[MCNP-VISUAL]` claims (5 axial zones x 12 cm, 140 regions), read visually off a zx slice~~
+  **ANSWERED 2026-08-12.** Kyle confirmed the reference subdivides **each fuel plate 2 x 10**, and that
+  materials should be matched **per plate**. Implemented at `01edb31`: 12,280 meat cells and 12,280
+  depletable materials, 1:1, zones 3.15 x 6.0 cm. All seven `[MCNP-VISUAL]` claims are resolved or
+  superseded; their records are kept dated in `materials.py`. See the C5 amendment in `PHASE1_AUDIT.md`.
+  *Residual:* zone uniformity was the natural reading of "2 x 10", not a separately confirmed statement.
+- **NEW, from the same exchange:** ADDER uses CE/CM (`cecm`), CRAM48, 4 substeps — recorded as dormant
+  `CoreConfig` fields. Still blocked: no depletion chain file exists on this machine, and OpenMC
+  `substeps` needs 0.16.0 for `CECMIntegrator` (we run 0.15.3). Whether ADDER's "substep" means the
+  same operation as OpenMC's is `[ASSUMED-EQUIVALENT — needs Kyle]`.
 - Whether `0.1305` is in the surface cards or only in the report figure (tag is currently `[MCNP]`, upgraded on his say-so)
 
 ### 10.3 MCNP-side rows still marked "will be updated"
@@ -441,10 +450,17 @@ dry-run by default, refuses a dirty tree, warns on an unpushed branch. Excludes
 ### 10.5 Known-stale artifacts
 
 `figures/*.pdf` and `fig1_core_map.png` predate the A-series — regenerate via
-`python figures/make_figures.py` before the next manuscript draft. The twelve
-`plots/*.png` from 27 July are untracked and **must not be regenerated**: eleven
-depict the unconfirmed `[MCNP-VISUAL]` depletion zoning, and regenerating makes
-an assumption look authoritative.
+`python figures/make_figures.py` before the next manuscript draft. The eleven
+`depletion_zones_*.png` from 27 July are untracked and **must not be regenerated**.
+
+**AMENDED 2026-08-12.** The reason has changed but the instruction has not. They no longer
+depict an *unconfirmed* scheme — they depict a **superseded** one, and by two generations:
+5 axial zones with element-shared materials, against the confirmed 2 x 10 per-plate scheme
+now implemented. Regenerating them would not make an assumption look authoritative; it
+would silently produce figures of a model that no longer exists. Note also that plates are
+not distinguishable in these views by design, so they could not evidence the per-plate
+split even if regenerated — that verification lives in the 1:1 structural check in
+`tests/check_depletion_zoning.py`.
 
 `model/run_results/core_run/` is internally inconsistent — a Jul-21 statepoint
 beside a Jul-31 `summary.h5` and `model.xml` that were accidentally overwritten
