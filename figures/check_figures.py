@@ -142,7 +142,7 @@ def test_files():
     SPLIT = M.FIG4_SPLIT_FRAC * TW
     spec = {'fig1_core_map': (None, 0, FIG1_WIDTH_FRAC*TW),
             'fig2_core_xy': (None, 1, M.FIG2_WIDTH_FRAC*TW),
-            'fig3_axial_xz': (None, 1, FIG1_WIDTH_FRAC*TW),
+            'fig3_axial_xz': (None, 2, FIG1_WIDTH_FRAC*TW),
             'fig4_elements': (None, 3, TW),
             'fig4a_sfe': (None, 1, SPLIT),
             'fig4b_cfe': (None, 1, SPLIT),
@@ -154,7 +154,14 @@ def test_files():
     f2w = (c1-c0+1)*px + 2*M.FIG2_POOL_MARGIN
     f2aw = M.FIG2_WIDTH_FRAC*TW*(1-2*M.PAD_TIGHT)
     req = {'fig2_core_xy': M.required_pixels(f2w, f2aw)[2],
-           'fig3_axial_xz': M.required_pixels(nx*px, FIG1_WIDTH_FRAC*TW*0.96)[2],
+           # fig3 is two panels sharing a height; the bound is the narrower
+           # one, panel (a). Its printed width follows fig4_elements' margins
+           # (0.015 sides, 0.045 gap) rather than the 0.96 of the single-panel
+           # form. Both panels in fact exceed this -- (b) is the wider window,
+           # so it needs more pixels -- and whichever image the PDF lists first
+           # clears it.
+           'fig3_axial_xz': M.required_pixels(
+               nx*px, FIG1_WIDTH_FRAC*TW*0.925 * (nx*px)/(nx*px + ny*py))[2],
            'fig4_elements': M.required_pixels(px, (TW-2*0.015*TW-2*0.045*TW)/3)[2],
            'fig4a_sfe': sp, 'fig4b_cfe': sp, 'fig4c_ft': sp}
     print(f'    {"figure":16s} {"page pt":>9s} {"target":>9s} {"imgs":>5s} {"embedded":>14s} {"required":>9s}')

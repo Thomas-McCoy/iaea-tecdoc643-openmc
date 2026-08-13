@@ -6,7 +6,8 @@ manuscript (Elsevier CAS, single column, a4paper).
 
     fig1_core_map.pdf    position designations only -- no material fills
     fig2_core_xy.pdf     OpenMC render, XY slice, full core at f = 0
-    fig3_axial_xz.pdf    OpenMC render, XZ slice through the absorber slot
+    fig3_axial_xz.pdf    OpenMC renders, axial elevation: XZ through the
+                         absorber slot | YZ on the D4 flux-trap axis
     fig4_elements.pdf    OpenMC renders, SFE | CFE | flux trap at one scale
 
 fig2-fig4 are native OpenMC geometry-plotter output -- flat fills, thin cell
@@ -160,6 +161,11 @@ OUTLINE_LW = 0.08          # measured; see the header table
 FIG3_POOL_MARGIN = 0.4 * ENDBOX_HEIGHT          # 5.6 cm
 FIG3_Z_HALF = ENDBOX_ABOVE_TOP + FIG3_POOL_MARGIN
 
+# fig3 panel (b): the y-z elevation is cut through the CENTRAL flux trap, named
+# by its CORE_MAP position rather than by coordinate. The other trap is A6, at
+# the core edge; D4 is the one the manuscript calls the central trap.
+FIG3_TRAP = 'D4'
+
 # fig4 split panels: each stands at 0.48 x textwidth so two sit side by side in
 # a row of minipages, or one at half measure.
 FIG4_SPLIT_FRAC = 0.48
@@ -214,6 +220,13 @@ def check_geometry_consistency():
         f'fig3 slot cut y={SLOT_Y} is outside the absorber band'
     assert ENDBOX_ABOVE_TOP < FIG3_Z_HALF < CORE_TOP, \
         'fig3 crop must clear the end box but stay inside the model'
+    # fig3 panel (b) must cut a flux trap, and cut it on the AXIS -- that is the
+    # only x giving the full 2r chord. Checked against CORE_MAP so that moving
+    # or renaming the trap fails here rather than silently shifting the cut.
+    _trap = [core_map_label(i, j) for i, r in enumerate(CORE_MAP)
+             for j, t in enumerate(r) if t == 'F']
+    assert FIG3_TRAP in _trap, \
+        f'fig3 panel (b): {FIG3_TRAP} is not a flux trap position (traps: {_trap})'
     S.check_palette()          # hard errors only: unparseable or duplicate colour
     S.check_type_sizes()
     print(f'  [OK] tripwires; slot cut y = {SLOT_Y:.4f} cm')
@@ -525,36 +538,106 @@ def fig2_core_xy(f=0.0):
     return save(fig, 'fig2_core_xy', target_in=W, expect_px=npx, axes_in=aw)
 
 
+def flux_trap_centre(lat, label):
+    """(x, y) of the flux trap at CORE_MAP position `label`.
+
+    Keyed on the LABEL, not on a row-major index. There are two traps -- D4 and
+    A6 -- and the y-z cut has to pass through the axis of a named one, so an
+    index would silently pick the other if CORE_MAP were ever reordered.
+    """
+    nx, ny = lat.shape
+    px, py = lat.pitch
+    llx, lly = lat.lower_left
+    ury = lly + ny * py
+    for i, row in enumerate(CORE_MAP):
+        for j, tok in enumerate(row):
+            if tok == 'F' and core_map_label(i, j) == label:
+                return llx + (j + 0.5) * px, ury - (i + 0.5) * py
+    raise RuntimeError(f'no flux trap at CORE_MAP position {label}')
+
+
 def fig3_axial_xz(f=0.0):
-    """XZ through the ABSORBER SLOT so the blade is in the figure. Outline ON."""
+    """Axial elevation, two panels. Outline ON.
+
+    (a) XZ through the ABSORBER SLOT so the blade is in the figure.
+    (b) YZ through the FIG3_TRAP flux trap, cut on its cylinder AXIS so the
+        hole shows its full 2 * FT_HOLE_RADIUS diameter -- the widest chord.
+        A y-z plane anywhere else through the trap shows a shorter chord and
+        understates it.
+
+    PANEL (a) IS UNCHANGED IN EVERY RESPECT THAT AFFECTS ITS CONTENT: same crop
+    (FIG3_Z_HALF), same window (nx * px), same cut (SLOT_Y), same palette, same
+    outline/frame flags, same pixel count. Only its PLACED SIZE moved, because a
+    second panel now shares the measure. The pixel count is genuinely identical
+    rather than coincidentally so: required_pixels() takes the max of a
+    feature-limited term and a print-limited one, and at both the old and new
+    printed widths the feature term (2 * 46.2 / 0.038 = 2432) dominates.
+
+    The panels are sized to a COMMON HEIGHT at equal aspect, so (b) comes out
+    wider than (a): the lattice is 7 rows deep in y and 6 columns across in x,
+    so the y window is 56.7 cm against 46.2. Neither window is cropped or
+    widened -- each is its axis's full lattice extent.
+
+    KNOWN, DELIBERATE, NOT FIXED HERE: panel (b) is the first thing in fig3 to
+    contain graphite (column D is G,S,S,F,S,S,G), so the shared key now carries
+    all EIGHT regions and coolant/graphite join the pairs sitting under
+    figstyle.VALUE_MIN -- four now, three of which fig3 already had. This is not
+    fixable by recolouring: eight levels 0.15 apart need 1.05 of luma span and
+    only 1.0 exists, so any real fix merges two regions onto one level, which is
+    out of scope. Narrowing (b)'s window to miss the reflector rows would hide
+    it rather than fix it, and is deliberately not done.
+    """
     geom = build_core_geometry(withdrawn_fraction=f)
     lat = core_lattice_of(geom)
-    nx, _ = lat.shape
-    px, _py = lat.pitch
-    llx, _lly = lat.lower_left
-    W_cm = nx * px
+    nx, ny = lat.shape
+    px, py = lat.pitch
+    llx, lly = lat.lower_left
+    W_cm = nx * px                              # 46.2 -- panel (a), unchanged
+    Y_cm = ny * py                              # 56.7 -- panel (b)
     Z_cm = 2 * FIG3_Z_HALF                      # cropped, see FIG3_POOL_MARGIN
     cx = llx + W_cm / 2
+    cy = lly + Y_cm / 2
+    tx, _ty = flux_trap_centre(lat, FIG3_TRAP)
 
+    # fig4_elements' margins, so the two multi-panel figures read as one system.
     W = FIG1_WIDTH_FRAC * textwidth_in()
+    pl = pr = 0.015 * W
+    gap = 0.045 * W
+    # Common height at equal aspect: pw_a + pw_b = ph * (W_cm + Y_cm) / Z_cm.
+    ph = (W - pl - pr - gap) * Z_cm / (W_cm + Y_cm)
+    pw = {'a': ph * W_cm / Z_cm, 'b': ph * Y_cm / Z_cm}
     y_leg = 0.0
-    pad_b = y_leg + 4 * 0.150 + 0.10
-    pl = pr = 0.02
-    aw = W * (1 - pl - pr)
-    ah = aw * Z_cm / W_cm
-    fig_h = ah + pad_b + 0.04
-    t1, t2, need = required_pixels(W_cm, aw)
-    npx = (need, int(round(need * Z_cm / W_cm)))
-    print(f'  fig3 pixels: feature {t1:.0f}, print {t2:.0f} -> {need} '
-          f'(clad {CLAD_THICK_INNER*need/W_cm:.2f} px)')
+    pad_b = y_leg + 4 * 0.150 + 0.10 + 0.20     # 4 key rows + gap + sub-caption
+    fig_h = pad_b + ph + 0.22
 
+    panels = [
+        # En dash as a literal U+2013, not '--': text.usetex is off, so
+        # matplotlib has no TeX ligature pass and '--' would set as two hyphens.
+        ('a', 'xz', (cx, SLOT_Y, 0.0), W_cm, 'x–z through the absorber slot'),
+        ('b', 'yz', (tx, cy, 0.0),     Y_cm, f'y–z through the {FIG3_TRAP} flux trap'),
+    ]
     fig = plt.figure(figsize=(W, fig_h))
-    ax = fig.add_axes([pl, pad_b / fig_h, 1 - pl - pr, ah / fig_h])
-    kinds = render(ax, geom, basis='xz', origin=(cx, SLOT_Y, 0.0),
-                   width=(W_cm, Z_cm), pixels=npx, outline=True, frame=True)
-    RENDERED['fig3_axial_xz'] = kinds
-    material_legend(fig, kinds, y_in=y_leg, ncol=2)
-    return save(fig, 'fig3_axial_xz', target_in=W, expect_px=npx, axes_in=aw)
+    allk = set()
+    x_in = pl
+    for k, (key, basis, origin, w_cm, cap) in enumerate(panels):
+        t1, t2, need = required_pixels(w_cm, pw[key])
+        npx = (need, int(round(need * Z_cm / w_cm)))
+        dpi_eff = npx[0] / pw[key]
+        assert dpi_eff >= 599.5, (
+            f'fig3 ({key}): {dpi_eff:.1f} dpi over {pw[key]:.4f} in is under 600')
+        ax = fig.add_axes([x_in / W, pad_b / fig_h, pw[key] / W, ph / fig_h])
+        allk |= render(ax, geom, basis=basis, origin=origin,
+                       width=(w_cm, Z_cm), pixels=npx, outline=True, frame=True)
+        panel_letter(fig, ax, '(%s)' % key)
+        caption(fig, ax, cap)
+        print(f'  fig3 ({key}) {basis} {w_cm:.1f}x{Z_cm:.1f} cm  '
+              f'{pw[key]*2.54:.2f}x{ph*2.54:.2f} cm  pixels feature {t1:.0f}, '
+              f'print {t2:.0f} -> {need} ({npx[0]}x{npx[1]}, {dpi_eff:.0f} dpi, '
+              f'clad {CLAD_THICK_INNER*need/w_cm:.2f} px)')
+        x_in += pw[key] + gap
+    RENDERED['fig3_axial_xz'] = allk
+    material_legend(fig, allk, y_in=y_leg, ncol=2)
+    return save(fig, 'fig3_axial_xz', target_in=W)
 
 
 def _cell_centre(tok, want_index=0):
