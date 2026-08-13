@@ -59,14 +59,24 @@ def derive_cooccurrence():
     W, H = nx * px, ny * py; Z = CORE_TOP - CORE_BOTTOM
     cx, cy = llx + W / 2, lly + H / 2
 
+    # (horizontal, vertical) axis index per basis, declared once instead of
+    # spelled out in a conditional. The previous form had no 'yz' branch: a
+    # 'yz' call fell through to the 'xy' arm and swept x/y at a fixed z --
+    # silently the wrong plane, with no error. Dormant only because every
+    # caller so far asked for 'xy' or 'xz'.
+    AXES = {'xy': (0, 1), 'xz': (0, 2), 'yz': (1, 2)}
+
     def scan(basis, origin, width, n):
+        ih, iv = AXES[basis]
         got = set()
         for i in range(n[0]):
-            u = origin[0] - width[0] / 2 + (i + .5) * width[0] / n[0]
+            u = origin[ih] - width[0] / 2 + (i + .5) * width[0] / n[0]
             for j in range(n[1]):
-                w = origin[2] - width[1] / 2 + (j + .5) * width[1] / n[1] \
-                    if basis == 'xz' else origin[1] - width[1] / 2 + (j + .5) * width[1] / n[1]
-                pt = (u, origin[1], w) if basis == 'xz' else (u, w, origin[2])
+                w = origin[iv] - width[1] / 2 + (j + .5) * width[1] / n[1]
+                pt = list(origin)
+                pt[ih] = u
+                pt[iv] = w
+                pt = tuple(pt)
                 try: seq = geom.find(pt)
                 except Exception: continue
                 for o in reversed(seq):
