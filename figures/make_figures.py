@@ -166,6 +166,49 @@ FIG3_Z_HALF = ENDBOX_ABOVE_TOP + FIG3_POOL_MARGIN
 # the core edge; D4 is the one the manuscript calls the central trap.
 FIG3_TRAP = 'D4'
 
+# ---------------------------------------------------------------------------
+# fig3 panel (b) crop -- WHY IT IS NOT PANEL (a)'s CROP
+# ---------------------------------------------------------------------------
+# Panel (a) is fixed, so the shared printed height is fixed, so at equal aspect
+# (b)'s SCALE is height / z-span. Narrowing (b) in Y cannot change that: it
+# crops, it does not magnify. At (a)'s 101.2 cm span the plate body -- the light
+# clad+meat+clad bar between two coolant channels -- prints 113 um, under the
+# ~170 um halftone cell, so the plate stack renders as a dark field with a
+# sub-resolution texture rather than as lamination. Only a shorter z span fixes
+# it, because only that raises the scale.
+#
+# 62.0 cm = 2 * HALF_PLATE_Z, the full fuel plate height: a real geometric
+# boundary, not a chosen round number. It gives 1:6.90, and:
+#     plate pitch  501 um     plate body  184 um  (clears the cell)
+#     meat          74 um     -- does NOT resolve, by design
+# So each plate reads as one light bar and the clad/meat/clad substructure
+# inside it stays merged. That is the intent: lamination reads as lamination,
+# not every detail.
+#
+# 24.3 cm = 3 * PITCH_Y, three whole lattice rows centred on the trap: a full
+# standard element, the trap, a full standard element. Whole rows, so no element
+# is sliced in half at the frame edge.
+FIG3_B_Z_HALF = HALF_PLATE_Z        # 31.0 cm
+FIG3_B_ROWS   = 3                   # D3, D4, D5
+
+# EMITTED width. The layout arithmetic still runs on FIG1_WIDTH_FRAC, because
+# that is what fixes panel (a)'s printed size and panel (a) must not move; but
+# the narrow (b) means the two panels no longer fill that measure, so the figure
+# is emitted at its own width instead of carrying 1.4 cm of dead margin. Held as
+# a declared fraction rather than measured at run time so that check_figures has
+# an independent number to test the emitted MediaBox against -- a target read
+# back out of the builder would only ever agree with itself.
+# Content measures 8.5 cm (the sub-captions overhang their panels slightly);
+# 0.53 leaves ~0.2 cm of slack, and save() asserts if that is ever exceeded.
+FIG3_WIDTH_FRAC = 0.53
+
+# CONSEQUENCE, RECORDED BECAUSE IT IS EASY TO MISREAD AS A FIX. This crop drops
+# the graphite reflector rows (column D is G,S,S,F,S,S,G) and, with the z crop,
+# the end box and pool water as well. The coolant/graphite pair that fig3 used
+# to carry is therefore OUT OF FRAME BY GEOMETRY -- the crop resolves nothing.
+# What resolved it is the 2026-08-13 palette rebuild, which moved the pair from
+# 0.0455 to 0.3076 everywhere it occurs, fig2 included. Two separate facts.
+
 # fig4 split panels: each stands at 0.48 x textwidth so two sit side by side in
 # a row of minipages, or one at half measure.
 FIG4_SPLIT_FRAC = 0.48
@@ -593,51 +636,73 @@ def fig3_axial_xz(f=0.0):
     px, py = lat.pitch
     llx, lly = lat.lower_left
     W_cm = nx * px                              # 46.2 -- panel (a), unchanged
-    Y_cm = ny * py                              # 56.7 -- panel (b)
-    Z_cm = 2 * FIG3_Z_HALF                      # cropped, see FIG3_POOL_MARGIN
+    Za_cm = 2 * FIG3_Z_HALF                     # 101.2, see FIG3_POOL_MARGIN
+    Y_cm = FIG3_B_ROWS * py                     # 24.3 -- panel (b), see above
+    Zb_cm = 2 * FIG3_B_Z_HALF                   # 62.0
     cx = llx + W_cm / 2
-    cy = lly + Y_cm / 2
-    tx, _ty = flux_trap_centre(lat, FIG3_TRAP)
+    tx, ty = flux_trap_centre(lat, FIG3_TRAP)
 
     # fig4_elements' margins, so the two multi-panel figures read as one system.
-    W = FIG1_WIDTH_FRAC * textwidth_in()
-    pl = pr = 0.015 * W
-    gap = 0.045 * W
-    # Common height at equal aspect: pw_a + pw_b = ph * (W_cm + Y_cm) / Z_cm.
-    ph = (W - pl - pr - gap) * Z_cm / (W_cm + Y_cm)
-    pw = {'a': ph * W_cm / Z_cm, 'b': ph * Y_cm / Z_cm}
-    y_leg = 0.0
-    pad_b = y_leg + 4 * 0.150 + 0.10 + 0.20     # 4 key rows + gap + sub-caption
-    fig_h = pad_b + ph + 0.22
+    # LAYOUT runs on FIG1_WIDTH_FRAC and nothing else, because that is what pins
+    # panel (a)'s printed width; the figure's own width falls out below.
+    W_layout = FIG1_WIDTH_FRAC * textwidth_in()
+    pl = pr = 0.015 * W_layout
+    gap = 0.045 * W_layout
+    # Panel (a) is FIXED, and it is what sets the shared height: its printed
+    # width is what it was, so ph follows from its own aspect. (b) is then sized
+    # to that same height at ITS aspect, which is why the two scales differ.
+    pw_a = (W_layout - pl - pr - gap) * W_cm / (W_cm + ny * py)
+    ph = pw_a * Za_cm / W_cm
+    pw = {'a': pw_a, 'b': ph * Y_cm / Zb_cm}
+    # The figure is exactly as wide as its content row. Sizing the canvas to
+    # W_layout instead would leave the panels sitting left of centre while the
+    # legend, anchored at 0.5 of the FIGURE, centred somewhere else entirely.
+    W = pl + pw['a'] + gap + pw['b'] + pr
 
+    # Sub-captions carry the EXTENT, not a scale ratio. Two panels of equal
+    # printed height showing different z ranges are self-evidently at different
+    # scales, and an extent in cm stays true however the figure is placed, where
+    # a stated ratio silently becomes wrong the moment anyone rescales it.
+    # Deliberately NOT 'enlarged 1.6x': (b) magnifies no region of (a), it is a
+    # different cut plane, and that phrasing invites reading it as a zoom.
     panels = [
         # En dash as a literal U+2013, not '--': text.usetex is off, so
         # matplotlib has no TeX ligature pass and '--' would set as two hyphens.
-        ('a', 'xz', (cx, SLOT_Y, 0.0), W_cm, 'x–z through the absorber slot'),
-        ('b', 'yz', (tx, cy, 0.0),     Y_cm, f'y–z through the {FIG3_TRAP} flux trap'),
+        ('a', 'xz', (cx, SLOT_Y, 0.0), W_cm, Za_cm,
+         'x–z through the absorber slot\n'
+         f'full model height, z = ±{FIG3_Z_HALF:.1f} cm'),
+        ('b', 'yz', (tx, ty, 0.0), Y_cm, Zb_cm,
+         f'y–z on the {FIG3_TRAP} flux-trap axis\n'
+         f'active region, z = ±{FIG3_B_Z_HALF:.0f} cm, larger scale'),
     ]
+    y_leg = 0.0
+    n_cap = max(c.count('\n') + 1 for *_r, c in panels)
+    pad_b = y_leg + 4 * 0.150 + 0.10 + 0.20 * n_cap
+    fig_h = pad_b + ph + 0.22
+
     fig = plt.figure(figsize=(W, fig_h))
     allk = set()
     x_in = pl
-    for k, (key, basis, origin, w_cm, cap) in enumerate(panels):
+    for key, basis, origin, w_cm, z_cm, cap in panels:
         t1, t2, need = required_pixels(w_cm, pw[key])
-        npx = (need, int(round(need * Z_cm / w_cm)))
+        npx = (need, int(round(need * z_cm / w_cm)))
         dpi_eff = npx[0] / pw[key]
         assert dpi_eff >= 599.5, (
             f'fig3 ({key}): {dpi_eff:.1f} dpi over {pw[key]:.4f} in is under 600')
         ax = fig.add_axes([x_in / W, pad_b / fig_h, pw[key] / W, ph / fig_h])
         allk |= render(ax, geom, basis=basis, origin=origin,
-                       width=(w_cm, Z_cm), pixels=npx, outline=True, frame=True)
+                       width=(w_cm, z_cm), pixels=npx, outline=True, frame=True)
         panel_letter(fig, ax, '(%s)' % key)
         caption(fig, ax, cap)
-        print(f'  fig3 ({key}) {basis} {w_cm:.1f}x{Z_cm:.1f} cm  '
-              f'{pw[key]*2.54:.2f}x{ph*2.54:.2f} cm  pixels feature {t1:.0f}, '
-              f'print {t2:.0f} -> {need} ({npx[0]}x{npx[1]}, {dpi_eff:.0f} dpi, '
-              f'clad {CLAD_THICK_INNER*need/w_cm:.2f} px)')
+        print(f'  fig3 ({key}) {basis} {w_cm:.1f}x{z_cm:.1f} cm  '
+              f'{pw[key]*2.54:.2f}x{ph*2.54:.2f} cm  1:{z_cm/(ph*2.54):.2f}  '
+              f'pixels feature {t1:.0f}, print {t2:.0f} -> {need} '
+              f'({npx[0]}x{npx[1]}, {dpi_eff:.0f} dpi)')
         x_in += pw[key] + gap
     RENDERED['fig3_axial_xz'] = allk
     material_legend(fig, allk, y_in=y_leg, ncol=2)
-    return save(fig, 'fig3_axial_xz', target_in=W)
+    return save(fig, 'fig3_axial_xz',
+                target_in=FIG3_WIDTH_FRAC * textwidth_in())
 
 
 def _cell_centre(tok, want_index=0):

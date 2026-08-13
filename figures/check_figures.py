@@ -118,22 +118,37 @@ def test_separation(pres):
     print(f'\n  freed (never co-occur, unconstrained): {len(freed)}')
     for a, b in freed:
         print(f'    {a:14s}/{b:14s} dL={abs(L[a]-L[b]):.3f} -- separated by hue across figures')
+    # Declared same-material merges are LISTED, never silently dropped: an
+    # exemption you cannot see in the output is indistinguishable from a bug.
+    # An exempt cell is marked 'ex' in the matrix and excluded from `worst`.
+    print(f'\n  declared exemptions ({len(S.EXEMPT_PAIRS)}) -- share a luma '
+          f'level, separate by hue, merge in greyscale:')
+    for a, b in sorted(S.EXEMPT_PAIRS):
+        print(f'    EXEMPT  {a:14s}/{b:14s} dL={abs(L[a]-L[b]):.4f}  '
+              f'(same material, two roles)')
     for f in sorted(pres):
         R = sorted(pres[f]); print(f'\n  {f} N x N luminance ({len(R)} regions)')
         print('        ' + ''.join(f'{x[:7]:>9s}' for x in R))
-        worst = 9.0
+        worst = 9.0; n_ex = 0
         for a in R:
             line = f'  {a[:7]:>7s}'
             for b in R:
-                if a == b: line += '        -'
+                if a == b:
+                    line += '        -'
+                elif S.is_exempt(a, b):
+                    n_ex += 1
+                    line += '       ex'
                 else:
                     d = abs(L[a]-L[b]); worst = min(worst, d); line += f'{d:9.3f}'
             print(line)
-        print(f'    min pair {worst:.4f}  {"OK" if worst >= VALUE_MIN else "FAIL"}')
+        ex_note = f'  ({n_ex // 2} exempt pair excluded)' if n_ex else ''
+        print(f'    min pair {worst:.4f}  '
+              f'{"OK" if worst >= VALUE_MIN else "FAIL"}{ex_note}')
         if worst < VALUE_MIN:
             fail(f'{f}: min pair {worst:.4f} < {VALUE_MIN}')
-    print('\n  mechanism: every co-occurring pair separates by VALUE alone;')
-    print('  no pair is colour-only, so the palette survives greyscale.')
+    print('\n  mechanism: every co-occurring NON-EXEMPT pair separates by VALUE')
+    print('  alone, so the palette survives greyscale. The exempt pair above is')
+    print('  the one place that is deliberately not true.')
 
 
 def test_files():
@@ -142,7 +157,9 @@ def test_files():
     SPLIT = M.FIG4_SPLIT_FRAC * TW
     spec = {'fig1_core_map': (None, 0, FIG1_WIDTH_FRAC*TW),
             'fig2_core_xy': (None, 1, M.FIG2_WIDTH_FRAC*TW),
-            'fig3_axial_xz': (None, 2, FIG1_WIDTH_FRAC*TW),
+            # fig3 emits at its own content width, not FIG1_WIDTH_FRAC: its two
+            # panels are at different scales and no longer fill that measure.
+            'fig3_axial_xz': (None, 2, M.FIG3_WIDTH_FRAC*TW),
             'fig4_elements': (None, 3, TW),
             'fig4a_sfe': (None, 1, SPLIT),
             'fig4b_cfe': (None, 1, SPLIT),
