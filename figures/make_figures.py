@@ -198,9 +198,10 @@ FIG3_B_ROWS   = 3                   # D3, D4, D5
 # a declared fraction rather than measured at run time so that check_figures has
 # an independent number to test the emitted MediaBox against -- a target read
 # back out of the builder would only ever agree with itself.
-# Content measures 8.5 cm (the sub-captions overhang their panels slightly);
-# 0.53 leaves ~0.2 cm of slack, and save() asserts if that is ever exceeded.
-FIG3_WIDTH_FRAC = 0.53
+# Content measures 8.07 cm -- the panel row, which is now the widest element
+# (the legend is 7.45 cm). 0.50 leaves ~0.16 cm of slack, and save() asserts if
+# that is ever exceeded. Was 0.53 while the sub-captions overhung their panels.
+FIG3_WIDTH_FRAC = 0.50
 
 # CONSEQUENCE, RECORDED BECAUSE IT IS EASY TO MISREAD AS A FIX. This crop drops
 # the graphite reflector rows (column D is G,S,S,F,S,S,G) and, with the z crop,
@@ -659,31 +660,25 @@ def fig3_axial_xz(f=0.0):
     # legend, anchored at 0.5 of the FIGURE, centred somewhere else entirely.
     W = pl + pw['a'] + gap + pw['b'] + pr
 
-    # Sub-captions carry the EXTENT, not a scale ratio. Two panels of equal
-    # printed height showing different z ranges are self-evidently at different
-    # scales, and an extent in cm stays true however the figure is placed, where
-    # a stated ratio silently becomes wrong the moment anyone rescales it.
-    # Deliberately NOT 'enlarged 1.6x': (b) magnifies no region of (a), it is a
-    # different cut plane, and that phrasing invites reading it as a zoom.
+    # NO SUB-CAPTIONS IN THE FIGURE. They carried each panel's z extent, which
+    # is what told a reader that the two panels are at DIFFERENT SCALES --
+    # (a) 1:11.26 over the full model height, (b) 1:6.90 over the active region.
+    # With them gone that information has to live in the manuscript caption
+    # instead; the in-figure cue is only that (b) visibly lacks the end boxes
+    # and pool water (a) opens and closes on. Panel letters stay, per
+    # fig4_elements' layout.
     panels = [
-        # En dash as a literal U+2013, not '--': text.usetex is off, so
-        # matplotlib has no TeX ligature pass and '--' would set as two hyphens.
-        ('a', 'xz', (cx, SLOT_Y, 0.0), W_cm, Za_cm,
-         'x–z through the absorber slot\n'
-         f'full model height, z = ±{FIG3_Z_HALF:.1f} cm'),
-        ('b', 'yz', (tx, ty, 0.0), Y_cm, Zb_cm,
-         f'y–z on the {FIG3_TRAP} flux-trap axis\n'
-         f'active region, z = ±{FIG3_B_Z_HALF:.0f} cm, larger scale'),
+        ('a', 'xz', (cx, SLOT_Y, 0.0), W_cm, Za_cm),
+        ('b', 'yz', (tx, ty, 0.0), Y_cm, Zb_cm),
     ]
     y_leg = 0.0
-    n_cap = max(c.count('\n') + 1 for *_r, c in panels)
-    pad_b = y_leg + 4 * 0.150 + 0.10 + 0.20 * n_cap
+    pad_b = y_leg + 4 * 0.150 + 0.10
     fig_h = pad_b + ph + 0.22
 
     fig = plt.figure(figsize=(W, fig_h))
     allk = set()
     x_in = pl
-    for key, basis, origin, w_cm, z_cm, cap in panels:
+    for key, basis, origin, w_cm, z_cm in panels:
         t1, t2, need = required_pixels(w_cm, pw[key])
         npx = (need, int(round(need * z_cm / w_cm)))
         dpi_eff = npx[0] / pw[key]
@@ -693,7 +688,6 @@ def fig3_axial_xz(f=0.0):
         allk |= render(ax, geom, basis=basis, origin=origin,
                        width=(w_cm, z_cm), pixels=npx, outline=True, frame=True)
         panel_letter(fig, ax, '(%s)' % key)
-        caption(fig, ax, cap)
         print(f'  fig3 ({key}) {basis} {w_cm:.1f}x{z_cm:.1f} cm  '
               f'{pw[key]*2.54:.2f}x{ph*2.54:.2f} cm  1:{z_cm/(ph*2.54):.2f}  '
               f'pixels feature {t1:.0f}, print {t2:.0f} -> {need} '
