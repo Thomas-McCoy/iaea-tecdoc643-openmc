@@ -60,7 +60,28 @@ THE LADDER, lightest to darkest
     0.3467  coolant water 316.8 K mid blue, same hue family as pool water,
                                   separated from it by value alone
     0.1933  B4C absorber          dark teal-green, MTR convention
-    0.0400  graphite reflector    neutral near-black, no hue
+    0.0400  graphite reflector    WARM near-black, not a neutral one
+
+GRAPHITE IS TINTED, AND IT CANNOT BE LIGHTENED
+
+A dead-neutral #0A0A0A read as a harsh black. It is warmed to #0D0A08 instead:
+a warm near-black reads softer than a neutral one at the same luminance, and it
+buys hue separation from the teal B4C directly above it.
+
+Warmed, NOT lightened, because it cannot be lightened. Graphite is the darkest
+level and the only pair constraining it is B4C, so its ceiling is
+0.1930 - 0.15 = 0.0430 -- a total lift of 0.0038 from where it sits, roughly one
+8-bit step. A genuine soft charcoal is luma 0.08 to 0.16, which would force B4C
+to 0.23+ against its own ceiling of coolant - 0.15 = 0.1968. Infeasible without
+moving every level, and shifting the whole ladder up by 0.04 puts pool water at
+0.998, which is page white.
+
+If a soft charcoal is ever actually wanted, the ONLY way to get one without
+re-solving is to swap graphite and B4C between these two levels: graphite takes
+0.193 as a true matte charcoal and B4C takes 0.040 as a near-black green. That
+is arguably the more faithful pair -- reactor graphite is matte dark grey and
+B4C is black -- and it was offered and declined on 2026-08-13, because it makes
+B4C the darkest thing in every figure that carries it.
 
 DESIGN INTENT, in priority order: faithful before pretty (aluminium silver,
 water blue, graphite black-grey, fuel warm); the two waters read as one family
@@ -240,7 +261,7 @@ REGION_FILL = {
     'structural_Al':  '#D2CDC7',   # 0.8071  silver-grey, faintly warm neutral
     'meat':           '#DA5E3D',   # 0.4993  the only saturated warm region
     'coolant':        '#32628C',   # 0.3468  mid blue, pool-water family
-    'graphite':       '#0A0A0A',   # 0.0392  neutral near-black, no hue
+    'graphite':       '#0D0A08',   # 0.0418  warm near-black, see below
     'end_box':        '#B5A48F',   # 0.6537  warm grey-tan, a mixture
     'B4C':            '#074635',   # 0.1930  dark teal-green, MTR convention
 }
