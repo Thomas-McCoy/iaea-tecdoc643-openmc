@@ -379,10 +379,12 @@ def run_depletion(cfg: CoreConfig):
     nobody chose, and the schedule is exactly what has to match ADDER-MCNP for
     the comparison to mean anything. That structure is still unconfirmed.
 
-    NO os.chdir(). The operator and integrator write into the CURRENT working
-    directory, so this runs where it was launched. Changing directory under a
-    long depletion run is how output lands somewhere nobody looks; if you want
-    the results elsewhere, launch from there.
+    Output goes to cfg.output_dir, prepared by _prepare_output_dir() the same
+    way the eigenvalue path prepares it, and handed to the operator as
+    op.output_dir. That is where depletion_results.h5 lands — the artifact that
+    matters, since it is written incrementally and is the only record of
+    completed steps. Still NO os.chdir(): the directory is passed, never
+    entered, so a long run cannot be relocated out from under itself.
     """
     if not cfg.depletion_timesteps:
         raise ValueError(
@@ -396,6 +398,7 @@ def run_depletion(cfg: CoreConfig):
     import openmc.deplete
 
     chain = resolve_chain_file(cfg)
+    out = _prepare_output_dir(cfg)
     model = build_model(cfg)
 
     # diff_burnable_mats is NOT set: the meat is already split into distinct
@@ -403,7 +406,7 @@ def run_depletion(cfg: CoreConfig):
     # so asking OpenMC to differentiate again would re-split materials that are
     # already unique and multiply the count for nothing.
     op = openmc.deplete.CoupledOperator(model, chain_file=chain)
-    op.output_dir = "out"
+    op.output_dir = out
     integrator_cls = {
         'predictor': openmc.deplete.PredictorIntegrator,
         'cecm':      openmc.deplete.CECMIntegrator,
@@ -419,7 +422,7 @@ def run_depletion(cfg: CoreConfig):
 
     print(f"[core] depletion: {cfg.depletion_integrator} / {cfg.solver}, "
           f"{len(cfg.depletion_timesteps)} steps, power {cfg.power_w:.4g} W")
-    print(f"[core] writing depletion_results.h5 into {os.getcwd()}")
+    print(f"[core] writing depletion_results.h5 into {out}")
     integrator.integrate()
 
 
