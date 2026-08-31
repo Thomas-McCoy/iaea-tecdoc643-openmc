@@ -403,7 +403,7 @@ def run_depletion(cfg: CoreConfig):
     # so asking OpenMC to differentiate again would re-split materials that are
     # already unique and multiply the count for nothing.
     op = openmc.deplete.CoupledOperator(model, chain_file=chain)
-
+    op.output_dir = "out"
     integrator_cls = {
         'predictor': openmc.deplete.PredictorIntegrator,
         'cecm':      openmc.deplete.CECMIntegrator,
