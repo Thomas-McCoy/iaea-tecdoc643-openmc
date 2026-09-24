@@ -119,26 +119,13 @@ water_core.add_s_alpha_beta('c_H_in_H2O')
 
 # =============================================================================
 # CONTROL BLADE MATERIAL
-# Hafnium (Hf) — used in IAEA generic 10 MW core control blades
-# Density: 13.31 g/cm3
+# B4C absorber, defined by atom densities from the reference MCNP model [MCNP].
+# set_density('sum') -> 2.000 g/cm3 [DERIVED].
+# The card is not natural stoichiometric B4C. Both departures are as given by
+# the MCNP card (ratios of its atom densities), not chosen here:
+#   B:C  = 4.45                (not 4.0)
+#   B-10 = 21.5 at% of boron   (not natural 19.9%)
 # =============================================================================
-
-# hafnium = openmc.Material(name='hafnium_control_blade')
-# hafnium.set_density('g/cm3', 13.31)
-# hafnium.add_element('Hf', 1.0, 'ao')
-
-# --- Alternative: Ag-In-Cd absorber (80-15-5 w/o) ---
-# ag_in_cd = openmc.Material(name='AgInCd_control_blade')
-# ag_in_cd.set_density('g/cm3', 10.17)
-# ag_in_cd.add_element('Ag', 0.80, 'wo')
-# ag_in_cd.add_element('In', 0.15, 'wo')
-# ag_in_cd.add_element('Cd', 0.05, 'wo')
-
-# --- Alternative: B4C absorber (natural boron) ---
-# b4c = openmc.Material(name='B4C_control_blade')
-# b4c.set_density('g/cm3', 2.52)
-# b4c.add_element('B', 4.0, 'ao')
-# b4c.add_element('C', 1.0, 'ao')
 
 b4c = openmc.Material(name='B4C control absorber')
 b4c.temperature = 294.0
@@ -173,10 +160,6 @@ b4c.set_density('sum')
 # recorded here because the log does not carry it.
 
 # NO S(a,b) on B4C carbon (the reference MCNP model has no mt card for it).
-# b4c.add_nuclide('B10', 1.914973e-02)   # atom/b-cm
-# b4c.add_nuclide('B11', 7.010412e-02)
-
-# b4c.set_density('sum')                 # = 1.093098e-01 atom/b-cm
 
 
 # =============================================================================
@@ -231,21 +214,16 @@ if USE_AL_SAB:
 
 # =============================================================================
 # END-BOX HOMOGENIZED MATERIAL
-# 25 v/o Al (2.70 g/cm³) / 75 v/o H₂O (0.993 g/cm³) per TECDOC-643 ANL appendix.
-# Used in the 15 cm end-box regions immediately above and below the active fuel.
-# Density = 0.25*2.70 + 0.75*0.993 = 1.41975 g/cm³
+# Homogenized Al/water end box. Atom densities from the reference MCNP model,
+# card m00004, at 316.8 K [MCNP]. set_density('sum') -> 1.41806 g/cm3 [DERIVED].
+# The mix is exactly 25 v/o Al / 75 v/o CORE water (water_core, not the 294 K
+# pool water) [DERIVED]:
+#   Al27 1.506565e-02 / 6.026260e-02 (Al metal)   = 0.2500
+#   H1   4.969068e-02 / 6.625423e-02 (core water) = 0.7500
+# Fills the 14 cm end box above and below the fuel plates, |z| = 31 -> 45 cm
+# (ENDBOX_HEIGHT in geometry.py).
+# TECDOC-643 A-2 gives 15 cm; the reference MCNP model uses 14 cm [MCNP].
 # =============================================================================
-
-# _vf_al  = 0.25
-# _vf_h2o = 0.75
-# _rho_al  = 2.70    # g/cm³
-# _rho_h2o = 0.993   # g/cm³ (at 38°C)
-
-# # Atom densities proportional to (v_fraction * rho) / M_mol
-# _n_al  = _vf_al  * _rho_al  / 26.982           # Al
-# _n_h   = _vf_h2o * _rho_h2o / 18.015 * 2.0    # H  (2 atoms per H₂O)
-# _n_o   = _vf_h2o * _rho_h2o / 18.015 * 1.0    # O
-# _n_tot = _n_al + _n_h + _n_o
 
 end_box_homog = openmc.Material(name='end_box_homogenized')
 end_box_homog.temperature = 316.8                      # card m00004: $ 316.8
@@ -261,14 +239,6 @@ if USE_AL_SAB:
 
 # Water component is H-1 + O-16 ONLY (no H-2/O-17/O-18) per the reference
 # MCNP model.
-# end_box_homog = openmc.Material(name='end_box_homogenized')
-# end_box_homog.set_density('g/cm3', _vf_al * _rho_al + _vf_h2o * _rho_h2o)  # 1.41975
-# end_box_homog.add_nuclide('Al27', _n_al / _n_tot)
-# end_box_homog.add_nuclide('H1',   _n_h  / _n_tot)
-# end_box_homog.add_nuclide('O16',  _n_o  / _n_tot)
-# end_box_homog.add_s_alpha_beta('c_H_in_H2O')
-# Al metal S(a,b) on the aluminum component now added (gated on USE_AL_SAB),
-# per the 2026-07-20 meeting decision.
 
 # =============================================================================
 # DEPLETION ZONING — per-element, per-(x,z)-zone fuel meat materials
@@ -435,7 +405,9 @@ if USE_AL_SAB:
 #   the live row is per-plate. Build times are build_model(); scan is the
 #   geometry_debug overlap scan at f=0.5.)
 #
-# materials.xml grew 22x, 0.22 -> 4.92 MB, tracking the material count exactly.
+# materials.xml grew 22x, 0.22 -> 4.92 MB, going from the OLD element-shared
+# 2 x 10 scheme (560 materials, 0.22 MB; not a row in the table above) to the
+# live per-plate one (12,280), tracking the material count exactly.
 # geometry.xml barely moved (1.85 -> 1.86 MB): the cells are unchanged, only the
 # material ID each one references. That split is the whole story of this change.
 #
