@@ -318,6 +318,54 @@ _CHAIN_INFERRED = ('endfb71_chain.pwr.xml',   # [INFERRED from the pattern]
                    'endfb80_chain.pwr.xml')   # [INFERRED from the pattern]
 
 
+# NAMED DEPLETION SCHEDULES. Selected explicitly with --schedule; there is
+# still no default, and run_depletion() still raises when nothing is set.
+# Naming a schedule at submit time is a choice on the record, not a value
+# inherited from a dataclass default.
+
+_SCHEDULES = {
+    # kyle-400d: full rundown with blades fully WITHDRAWN (pair with
+    # --insertion 0), per Kyle Anderson 2026-08-31 — deplete until the reactor
+    # can no longer run, NO critical blade search, run until k-eff < 1.
+    # Fibonacci ramp maxing at 21 d: 1,1,2,3,5,8,13,21 = 54 d in 8 steps, then
+    # 17 x 21 d = 357 d, ending at 411 days over 25 steps.
+    # [ADDER/MCNP — Kyle 2026-08-31]
+    'kyle-400d': [(d, 'd') for d in
+                  [1.0, 1.0, 2.0, 3.0, 5.0, 8.0, 13.0, 21.0] + [21.0] * 17],
+                  
+    # fine-318end: kyle-400d step lengths truncated to end at 318 d, matching
+    # valerio-318d / coarse-318end for final-state and isotopic comparison.
+    # A 12 d step is inserted before the 13 d step so the 21 d cap lands on
+    # 318: 1,1,2,3,5,8,12,13,21 = 66 d in 9 steps, then 12 x 21 d = 252 d,
+    # 318 days over 21 steps. Grid matches kyle-400d only through t = 20 d.
+    # [1x step-size schedule — paired with coarse-318end for ADDER comparison]
+    'fine-318end': [(d, 'd') for d in
+                  [1.0, 1.0, 2.0, 3.0, 5.0, 8.0, 12.0, 13.0, 21.0] + [21.0] * 12],
+    # valerio-318d: doubled step lengths against kyle-400d, to measure CE/CM
+    # sensitivity to step size. Ramp 2,2,4,6,10,16,26,42 = 108 d in 8 steps,
+    # then 5 x 42 d = 210 d, ending at 318 days over 13 steps.
+    # Shares only t = 0, 2 and 4 d with kyle-400d, so the two are compared on
+    # the interpolated k-eff = 1 crossing, not point by point.
+    # [SUGGESTED — Valerio 2026-09-01, not an ADDER-matched schedule]
+    'valerio-318d': [(d, 'd') for d in
+                     [2.0, 2.0, 4.0, 6.0, 10.0, 16.0, 26.0, 42.0] + [42.0] * 5],
+                     
+    # coarse-318end: identical to valerio-318d; separate name for the
+    # ADDER-MCNP coarse-schedule comparison (pairs with fine-318end).
+    'coarse-318end': [(d, 'd') for d in
+                     [2.0, 2.0, 4.0, 6.0, 10.0, 16.0, 26.0, 42.0] + [42.0] * 5],
+    # valerio-300d: quadrupled step lengths against kyle-400d (doubled against
+    # valerio-318d), extending the CE/CM step-size sensitivity study to a third
+    # point. Ramp 4,4,8,12,20,32,52,84 = 216 d in 8 steps, then one more 84 d
+    # step, ending at 300 days over 9 steps (job 15348).
+    # Shares only t = 0 and 4 d with kyle-400d, and t = 0, 4 and 8 d with
+    # valerio-318d, so all three are compared on the interpolated crossing.
+    # [SUGGESTED — Valerio 2026-09-14, not an ADDER-matched schedule]
+    'valerio-300d': [(d, 'd') for d in
+                     [4.0, 4.0, 8.0, 12.0, 20.0, 32.0, 52.0, 84.0,
+                      84.0]],
+}
+
 def resolve_chain_file(cfg: CoreConfig) -> str:
     """Pick the depletion chain file, refusing the ones that would mislead.
 
@@ -462,6 +510,10 @@ def main(argv=None):
                         'There is no default schedule.')
     p.add_argument('--step-days', type=float, default=None, metavar='D',
                    help='length of each depletion step in days')
+    p.add_argument('--schedule', type=str, default=None,
+                   choices=sorted(_SCHEDULES),
+                   help='named depletion schedule (see _SCHEDULES). Mutually '
+                        'exclusive with --timesteps/--step-days.')
     args = p.parse_args(argv)
 
     cfg = CoreConfig()
@@ -485,6 +537,10 @@ def main(argv=None):
         cfg.chain_file = args.chain_file
     if args.power is not None:
         cfg.power_w = args.power
+    if args.schedule is not None:
+        if args.timesteps is not None or args.step_days is not None:
+            p.error('--schedule cannot be combined with --timesteps/--step-days')
+        cfg.depletion_timesteps = list(_SCHEDULES[args.schedule])
     if args.timesteps is not None or args.step_days is not None:
         if args.timesteps is None or args.step_days is None:
             p.error('--timesteps and --step-days must be given together')
