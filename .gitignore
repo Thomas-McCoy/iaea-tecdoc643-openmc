@@ -28,3 +28,8 @@ figures/solidworks_*.txt
 # Python
 __pycache__/
 *.py[cod]
+
+# analysis/: scripts tracked, extracted data not
+analysis/*.npy
+analysis/*.csv
+analysis/*.json
