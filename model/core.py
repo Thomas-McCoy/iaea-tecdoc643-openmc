@@ -60,6 +60,12 @@ class CoreConfig:
     inactive:  int = 50
     seed:      int | None = None          # None → OpenMC default (1)
     
+    # Fission Q-recoverable source for depletion power normalization.
+    # 'chain' = values in the depletion chain (OpenMC default, used by jobs
+    # 15117/15196/15348). 'adder' = ADDER/MCNP empirical fit, see
+    # adder_fission_q(). Set explicitly with --fission-q.
+    fission_q_mode: str = 'chain'
+
     # Depletion material zoning — segment the fuel meat on an (x, z) grid into
     # PER-PLATE, per-zone depletable materials: 614 plates x N_X_ZONES x
     # N_AXIAL_ZONES = 12,280 materials at the 2 x 10 default, filling 12,280
@@ -366,6 +372,20 @@ _SCHEDULES = {
                       84.0]],
 }
 
+def adder_fission_q(chain_path: str) -> dict:
+    """ADDER/MCNP fission Q-recoverable in eV for every chain nuclide with a
+    fission reaction: Q = 1.29927e-3 * Z^2 * sqrt(A) + 33.12 MeV.
+    [ADDER convention — matches ADDER-MCNP power normalization]"""
+    import xml.etree.ElementTree as ET
+    q = {}
+    for nuc in ET.parse(chain_path).getroot():
+        if any(r.get('type') == 'fission' for r in nuc.findall('reaction')):
+            name = nuc.get('name')
+            Z, A, _ = openmc.data.zam(name)
+            q[name] = (1.29927e-3 * Z * Z * A ** 0.5 + 33.12) * 1.0e6
+    return q
+
+
 def resolve_chain_file(cfg: CoreConfig) -> str:
     """Pick the depletion chain file, refusing the ones that would mislead.
 
@@ -453,7 +473,12 @@ def run_depletion(cfg: CoreConfig):
     # per-plate, per-zone materials by the zoning layer (see depletion_zoning),
     # so asking OpenMC to differentiate again would re-split materials that are
     # already unique and multiply the count for nothing.
-    op = openmc.deplete.CoupledOperator(model, chain_file=chain)
+    print(f'fission Q source: {cfg.fission_q_mode}')
+    if cfg.fission_q_mode == 'adder':
+        op = openmc.deplete.CoupledOperator(
+            model, chain_file=chain, fission_q=adder_fission_q(chain))
+    else:
+        op = openmc.deplete.CoupledOperator(model, chain_file=chain)
     op.output_dir = out
     integrator_cls = {
         'predictor': openmc.deplete.PredictorIntegrator,
@@ -510,6 +535,10 @@ def main(argv=None):
                         'There is no default schedule.')
     p.add_argument('--step-days', type=float, default=None, metavar='D',
                    help='length of each depletion step in days')
+    p.add_argument('--fission-q', type=str, default=None,
+                   choices=['chain', 'adder'],
+                   help="fission Q-recoverable: 'chain' (default) or 'adder' "
+                        "(ADDER/MCNP 1.29927e-3*Z^2*sqrt(A)+33.12 MeV)")
     p.add_argument('--schedule', type=str, default=None,
                    choices=sorted(_SCHEDULES),
                    help='named depletion schedule (see _SCHEDULES). Mutually '
@@ -537,6 +566,8 @@ def main(argv=None):
         cfg.chain_file = args.chain_file
     if args.power is not None:
         cfg.power_w = args.power
+    if args.fission_q is not None:
+        cfg.fission_q_mode = args.fission_q
     if args.schedule is not None:
         if args.timesteps is not None or args.step_days is not None:
             p.error('--schedule cannot be combined with --timesteps/--step-days')
