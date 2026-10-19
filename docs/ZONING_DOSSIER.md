@@ -1,5 +1,10 @@
 # Depletion Zoning — Changes Dossier
 
+> **Terminology note (2026-10-19).** Quoted passages and card-level details in this
+> document were rewritten to current project terminology ("reference MCNP model";
+> plain material and nuclide names instead of MCNP card syntax). Meaning is unchanged;
+> the original wording is in git history.
+
 **Status: working document, raw material for a written report. Not a polished
 deliverable.** Completeness is preferred over prose. Where something is
 uncertain it is flagged inline as **[UNCERTAIN]** rather than smoothed over.
@@ -946,7 +951,7 @@ And nothing reads `depletion_results.h5`.
 
 2. **The `[MCNP]` tags rest on a relayed statement, not transcribed cards.**
    Both 2 × 10 and per-plate materials come from what Kyle said, not from reading
-   the MCNP input deck. That is the same provenance class as several existing
+   the reference MCNP model input. That is the same provenance class as several existing
    `[MCNP]` tags in this project, and it carries the same exposure: **it rests on
    a person, not a document.** A surface-card diff could disagree later without
    either side having done anything wrong.

@@ -22,8 +22,8 @@ USE_NATURAL_CARBON = 'endfb70' in os.environ.get('OPENMC_CROSS_SECTIONS', '')
 # =============================================================================
 # FUEL MATERIAL
 # LEU U3Si2-Al fuel, 19.75 w/o enriched uranium
-# Atom densities (atom/b-cm) taken directly from the reference MCNP deck.
-# NO thermal scattering table on the fuel (deck has no mt card for it).
+# Atom densities (atom/b-cm) taken directly from the reference MCNP model.
+# NO thermal scattering table on the fuel (none in the reference MCNP model).
 # =============================================================================
 
 fuel = openmc.Material(name='LEU_U3Si2_Al_fuel')
@@ -46,20 +46,20 @@ clad.set_density('g/cm3', 2.70)
 clad.add_element('Al', 1.00, 'ao')
 # Pure aluminum stands in for 6061-T6; the minor alloying elements (Mg, Si, Cu,
 # Cr, Zn, Ti, Fe — ~2.7 w/o total) have negligible reactivity effect here.
-# NO S(a,b) on cladding aluminum (deck has no mt card for Al):
+# NO S(a,b) on cladding aluminum (no Al table in the reference MCNP model):
 # clad.add_s_alpha_beta('c_Al27')
 
 # =============================================================================
 # COOLANT / MODERATOR
-# Two water materials per MCNP deck cross-section assignments:
+# Two water materials per the reference MCNP model's cross-section assignments:
 #   - Bulk pool water:  0.9975 g/cm³ at 294 K   (H1 = 6.66909e-2 atom/b-cm)
 #   - Flux trap water:  0.9909 g/cm³ at 316.8 K (H1 = 6.625423e-2 atom/b-cm)
 # (Mass densities print ~0.02% lower than the nominal values because the
 # O-16-only basis has a slightly lower molar mass than natural oxygen; the
-# H1/O16 atom densities above are the deck-authoritative quantities.)
+# H1/O16 atom densities above are the authoritative quantities (reference MCNP model).)
 # =============================================================================
 
-# Water is H-1 + O-16 ONLY (no H-2/O-17/O-18), matching the deck's O-16 basis.
+# Water is H-1 + O-16 ONLY (no H-2/O-17/O-18), matching the reference MCNP model's O-16 basis.
 water = openmc.Material(name='light_water_294K')
 water.temperature = 294.0
 water.add_nuclide('H1', 6.66909e-02)
@@ -110,7 +110,7 @@ else:
     b4c.add_nuclide('C13', 2.005592e-02 * 0.0107)
 b4c.set_density('sum')
 
-# NO S(a,b) on B4C carbon (deck has no mt card for it).
+# NO S(a,b) on B4C carbon (none in the reference MCNP model).
 # b4c.add_nuclide('B10', 1.914973e-02)   # atom/b-cm
 # b4c.add_nuclide('B11', 7.010412e-02)
 # b4c.add_nuclide('C0',  2.005592e-02)
@@ -141,7 +141,7 @@ graphite.add_s_alpha_beta('c_Graphite')
 aluminum = openmc.Material(name='aluminum_structure')
 aluminum.set_density('g/cm3', 2.70)
 aluminum.add_element('Al', 1.0, 'ao')
-# NO S(a,b) on structural aluminum (deck has no mt card for Al).
+# NO S(a,b) on structural aluminum (no Al table in the reference MCNP model).
 
 # =============================================================================
 # END-BOX HOMOGENIZED MATERIAL
@@ -161,14 +161,14 @@ _n_h   = _vf_h2o * _rho_h2o / 18.015 * 2.0    # H  (2 atoms per H₂O)
 _n_o   = _vf_h2o * _rho_h2o / 18.015 * 1.0    # O
 _n_tot = _n_al + _n_h + _n_o
 
-# Water component is H-1 + O-16 ONLY (no H-2/O-17/O-18) per the deck.
+# Water component is H-1 + O-16 ONLY (no H-2/O-17/O-18) per the reference MCNP model.
 end_box_homog = openmc.Material(name='end_box_homogenized')
 end_box_homog.set_density('g/cm3', _vf_al * _rho_al + _vf_h2o * _rho_h2o)  # 1.41975
 end_box_homog.add_nuclide('Al27', _n_al / _n_tot)
 end_box_homog.add_nuclide('H1',   _n_h  / _n_tot)
 end_box_homog.add_nuclide('O16',  _n_o  / _n_tot)
 end_box_homog.add_s_alpha_beta('c_H_in_H2O')
-# NO S(a,b) on the aluminum component (deck has no mt card for Al).
+# NO S(a,b) on the aluminum component (no Al table in the reference MCNP model).
 
 # =============================================================================
 # Collect all materials into a Materials object for export

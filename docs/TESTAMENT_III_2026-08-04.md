@@ -1,5 +1,10 @@
 # TESTAMENT III — Phase 1 Close-Out and Phase 2 Handoff
 
+> **Terminology note (2026-10-19).** Quoted passages and card-level details in this
+> document were rewritten to current project terminology ("reference MCNP model";
+> plain material and nuclide names instead of MCNP card syntax). Meaning is unchanged;
+> the original wording is in git history.
+
 **Date:** 2026-08-04
 **Supersedes:** `PROJECT_BIBLE.md` (2026-07-06) and `TESTAMENT_II` (2026-07-20), both
 of which are stale in specific, listed ways. See §9.
@@ -52,7 +57,7 @@ the magnitude sane, do the blades move it the right way), never a target.
 | ID | Item | Resolution |
 |---|---|---|
 | A1 | Flux trap water hole radius | 2.500 -> **2.820** (area-equivalent to the 50 mm square hole, 25 cm² -> r = 2.8209) |
-| A2 | Graphite density | No mass density. **Atom density 8.724000E-02** direct from reference MCNP card `m00005` |
+| A2 | Graphite density | No mass density. **Atom density 8.724000E-02** direct from the reference MCNP model's graphite material |
 | A3 | Control element outer water | `CTRL_OUTER_OFFSET` 0.1075 -> **0.1305**, de-aliased from `STD_END_WATER`; `CTRL_BLADE_WATER` derives to 0.1275 |
 | A4 | Blade top cladding | **1.0 cm of aluminium, top end only.** No side clad, no bottom clad |
 
@@ -181,7 +186,7 @@ it is the justification for the final `[MCNP]` tag:
    value. **Committed (10f607f), then rejected by Kyle.** The commit is
    deliberately left in history; the log showing a value committed and corrected
    *is* the provenance record.
-4. **8.724000E-02 atom/b-cm `[MCNP]`** — direct from card `m00005`, pasted
+4. **8.724000E-02 atom/b-cm `[MCNP]`** — direct from the graphite material definition, pasted
    verbatim by the model owner. Commit 6288fb4 supersedes 10f607f.
 
 **It back-converts to 1.74000 g/cm³** using OpenMC's isotopic masses
@@ -190,9 +195,9 @@ round-tripped through a lossy mass-density conversion. The final change is a
 **provenance and method fix, not a physics change** — phrase it that way in the
 manuscript.
 
-### 5.2 ZAID 6000 and the carbon problem
+### 5.2 Natural carbon and the carbon problem
 
-Kyle's card uses `6000` — **natural elemental carbon**, unsplit. OpenMC's
+Kyle's material definition uses **natural elemental carbon**, unsplit. OpenMC's
 `add_element('C')` expands to C12/C13 using its own abundance table
 (0.988922 / 0.011078, which differs from the IUPAC representative composition
 0.9893 / 0.0107 — this is OpenMC's table by design, do not "correct" it).
@@ -256,7 +261,7 @@ the tag currently covers:
 
 | Strength | Constants |
 |---|---|
-| Verbatim card transcription | graphite `m00005` — **one** |
+| Verbatim material transcription | graphite — **one** |
 | Spreadsheet MCNP column | `POOL_WATER_THICK`, `ABSORBER_WIDTH`, `ENDBOX_HEIGHT`, `PLATE_HEIGHT` |
 | Kyle verbal or relayed | `BLADE_TOP_CLAD`, `CTRL_OUTER_OFFSET` (which he said may not be in the model yet) |
 | Structural alias | the four `FT_`/`REFL_BLOCK` constants |
@@ -345,21 +350,21 @@ full version with verbatim quotes.
 |---|---|
 | Axial stack "45 / 15 / 60 / 15 / 45" | B1: 45 / 14 / 1 / 60 / 1 / 14 / 45 |
 | `FT_HOLE_RADIUS` 2.5 `[ASSUMED]` | A1: 2.820 `[MCNP]` |
-| Graphite 1.7000 `[TECDOC]` | A2: 8.724000E-02 atom/b-cm `[MCNP]`, card m00005 |
+| Graphite 1.7000 `[TECDOC]` | A2: 8.724000E-02 atom/b-cm `[MCNP]`, graphite material definition |
 | Flux trap a full-pitch block | B2: 7.6 x 8.0 |
 | Graphite a continuous in-plane wall | B2: discrete 7.6 x 8.0 blocks with 1 mm gaps |
 | Cap 15 cm rigidly attached | B1 + A4: 14 cm, riding on the blade top clad |
 | Control offset 0.1075 | A3: 0.1305 |
 | k-eff 18,853 pcm and the −385 / −556 bias figures | **Retired.** Measured pre-`7660f56`, before the end-box slivers were replaced with full-pitch homogenate — a *correctness fix*. Neither endpoint of "18,853 -> 18,373" was ever measured at a single pinned configuration |
-| §T2.2 voids all `[DECK]`-transcribed provenance | Reasoning survives and governs (audit C3 applies exactly that test), but the blanket form would wrongly void card `m00005`, the strongest provenance in the codebase |
+| §T2.2 voids all provenance transcribed from the reference MCNP model | Reasoning survives and governs (audit C3 applies exactly that test), but the blanket form would wrongly void the graphite material definition, the strongest provenance in the codebase |
 
 ### 9.2 `PROJECT_BIBLE.md` (2026-07-06)
 
-8 x 9 lattice; vacuum at z = −65 / +95; graphite 1.70; "verify against the deck's
-CYL surface". Also: **Task 1 is not complete**, contrary to its own header.
+8 x 9 lattice; vacuum at z = −65 / +95; graphite 1.70; "verify against the reference MCNP model's
+cylinder surface". Also: **Task 1 is not complete**, contrary to its own header.
 
-**Note:** "deck" is forbidden terminology project-wide. Always "MCNP model" or
-"reference MCNP model".
+**Note:** the only allowed names are "MCNP model" or "reference MCNP model",
+project-wide.
 
 ### 9.3 The regression — the most important process finding
 
@@ -418,8 +423,8 @@ bookkeeping.
 
 ### 10.2 With Kyle
 
-- Graphite MT card — `m00005` shows the atom density but MT cards are separate in MCNP, so its absence proves nothing. `c_Graphite` on a reflector is a large effect
-- Al MT card — he will add Al S(α,β) in his own time; the OpenMC side already has it. **Until both have it, a comparison is a known method difference, not a matched configuration**
+- Graphite thermal-scattering assignment — the graphite material definition shows the atom density, but MCNP assigns thermal scattering separately, so its absence proves nothing. `c_Graphite` on a reflector is a large effect
+- Al thermal-scattering assignment — he will add Al S(α,β) in his own time; the OpenMC side already has it. **Until both have it, a comparison is a known method difference, not a matched configuration**
 - Whether the reference k-eff targets were themselves checked for source convergence
 - Outer-pool water H-1 / O-16: 6.669090E-02 vs 6.673560E-02, 0.067% against a 0.010% tolerance, no decision on record. **This matters more since B4** — that material now fills the entire 38.5 cm pool rather than a thin ring
 - ~~Depletion zoning — the seven `[MCNP-VISUAL]` claims (5 axial zones x 12 cm, 140 regions), read visually off a zx slice~~
@@ -514,7 +519,7 @@ Resistance Optimization.
    any geometry change. Necessary, not sufficient.
 7. **Negative-test asserts.** Inject the fault; confirm it fires.
 8. **Plan-then-approve** before production file edits.
-9. **Never "deck."** Always "MCNP model" or "reference MCNP model."
+9. **Call it only "MCNP model" or "reference MCNP model."** No other name.
 10. **Phase 1 geometry is closed. Task 1 is not.** Do not describe the
     cross-validation as complete or validated.
 

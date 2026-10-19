@@ -1,5 +1,10 @@
 # Superseded Notes — what HEAD contradicts in the project documents
 
+> **Terminology note (2026-10-19).** Quoted passages and card-level details in this
+> document were rewritten to current project terminology ("reference MCNP model";
+> plain material and nuclide names instead of MCNP card syntax). Meaning is unchanged;
+> the original wording is in git history.
+
 **Purpose.** `PROJECT_BIBLE.md` (2026-07-06) and `TESTAMENT_II_2026-07-20.md`
 (2026-07-20) are the onboarding documents for this project. Both live in
 `/mnt/c/Users/23tho/Downloads/`, **outside version control**, so nothing in the
@@ -63,14 +68,14 @@ and "withdrawn (f=1) blade top coincides with CORE_TOP; no cap above".
 ### 1.3 Graphite reflector — T2.1, T2.5, and the Bible's material table
 
 > **T2.1:** "graphite **1.7000 g/cm³ [TECDOC]**, per 7/20 meeting. The 1.740
-> deck-implied claim is void (T2.2)."
+> claim implied by the reference MCNP model is void (T2.2)."
 > **T2.5:** "**Graphite reflector:** continuous in-plane wall (full pitch) in
 > the active z-range. **Inter-block water channels pending the MCNP dimension.**"
 
 **Three contradictions.**
 
 - **Density — `6288fb4` (A2 final).** Graphite is specified in atom/b-cm
-  directly from reference MCNP card `m00005`: **8.724000E-02 atoms/b-cm total
+  directly from the reference MCNP model's graphite material: **8.724000E-02 atoms/b-cm total
   carbon**, `[MCNP]`. Not 1.7000, and not `[TECDOC]` — **TECDOC-643 specifies no
   graphite density at all.** The 1.7000 g/cm³ figure was recorded as decided at
   the 7/20 meeting but **was never implemented**; the code ran 1.7400
@@ -156,21 +161,18 @@ natural carbon only — the C-12/C-13 split arrived in VII.1).
 
 ### 1.8 **T2.2 Provenance Reset — superseded, and this one matters**
 
-> "**No exact numerical values from Kyle's reference MCNP deck are known.** …
-> Every prior claim of deck-transcribed exact values — atom densities 'taken
-> directly from the deck,' the 1.740 graphite density, the 5-sig-fig m-card
-> matches — is **void as [DECK] provenance**. … Until that spreadsheet arrives,
-> treat every numeric spec as [TECDOC], [DERIVED], or [ASSUMED] — never [DECK]."
+> "**No exact numerical values from Kyle's reference MCNP model are known.** …
+> Every prior claim of exact values transcribed from it — atom densities 'taken
+> directly from the reference MCNP model,' the 1.740 graphite density, the
+> 5-sig-fig material-definition matches — is **void as reference-MCNP-model
+> provenance**. … Until that spreadsheet arrives, treat every numeric spec as
+> [TECDOC], [DERIVED], or [ASSUMED] — never as reference-MCNP-model provenance."
 
 **Superseded by `6288fb4` (A2 final).** The rule was written on 2026-07-20 when
 no verified transcription existed and prior claims of one had proven unreliable.
-That epistemic situation has changed: on 2026-07-31 **the model owner pasted card
-`m00005` verbatim**:
-
-```
-m00005     $     294.0    Graphite reflector
-       6000    8.724000E-02
-```
+That epistemic situation has changed: on 2026-07-31 **the model owner pasted the
+graphite material definition verbatim**: graphite reflector, 294.0 K, natural
+carbon at 8.724000E-02 atom/b-cm.
 
 This is the **strongest provenance in the codebase** — a direct transcription
 from the reference model, supplied by its owner, reproduced in the code comment
@@ -181,10 +183,9 @@ void the one value in the repository that has unimpeachable provenance. The
 rule's *reasoning* — do not claim transcription you cannot support — is sound
 and still governs everywhere else; its *blanket form* is now wrong.
 
-Also note the terminology: T2.2 is written throughout in terms of `[DECK]` and
-"the deck". Current project rules forbid "deck" entirely — it is "the reference
-MCNP model" — and the provenance tag is `[MCNP]`, not `[DECK]`. The tag T2.2
-prohibits no longer exists.
+Also note the terminology: T2.2 predates the current naming. It used a
+superseded term for the reference MCNP model, and a provenance tag that has
+since been renamed `[MCNP]`. The tag name T2.2 prohibits no longer exists.
 
 **What survives, and should be kept:** the epistemic discipline. Where a value's
 origin is a spreadsheet column or a relayed statement rather than a card, the
@@ -233,7 +234,7 @@ exactly this. See §4 — this is a process finding, not just a value one.
 ### 2.3 Flux trap — Bible §5
 
 > "`FT_HOLE_RADIUS = 2.5` (**ASSUMED** — inscribed radius of the 50 mm square;
-> verify against the deck's CYL surface). … A-2 Table 1 vs. Chapter
+> verify against the reference MCNP model's cylinder surface). … A-2 Table 1 vs. Chapter
 > 7/Appendix G treat flux traps differently — **confirm with Kyle which
 > configuration is the benchmark reference.**"
 
@@ -249,15 +250,15 @@ never carried forward into it.
 > "| Graphite | **1.70 g/cm³** | `c_Graphite` S(α,β) |"
 
 Superseded — see 1.3. `c_Graphite` survives, **but whether the reference MCNP
-model carries the corresponding MT card is an open question with Kyle.** Its
-absence from the `m00005` snippet proves nothing, since MCNP specifies MT
-separately. For a reflector this is a large effect.
+model carries the corresponding thermal-scattering assignment is an open
+question with Kyle.** Its absence from the graphite material snippet proves
+nothing, since MCNP assigns thermal scattering separately from the material. For a reflector this is a large effect.
 
 ### 2.5 Terminology — throughout both documents
 
-Both use "deck" pervasively ("Kyle's deck", "the deck's CYL surface",
-"deck-authoritative", "[DECK]"). Current project rules forbid the term: it is
-"the MCNP model" or "the reference MCNP model". The code was cleaned of it at
+Both use a superseded term for the reference MCNP model throughout, including
+as a provenance tag. Current project rules allow only "the MCNP model" or
+"the reference MCNP model". The code was cleaned of it at
 `bb84f33`. The documents have not been.
 
 ---

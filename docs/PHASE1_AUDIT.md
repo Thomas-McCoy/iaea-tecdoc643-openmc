@@ -1,5 +1,10 @@
 # Phase 1 Geometry — Close-Out Audit
 
+> **Terminology note (2026-10-19).** Quoted passages and card-level details in this
+> document were rewritten to current project terminology ("reference MCNP model";
+> plain material and nuclide names instead of MCNP card syntax). Meaning is unchanged;
+> the original wording is in git history.
+
 **Repository:** `~/iaea-tecdoc643-openmc` (dev), remote `github.com/Thomas-McCoy/iaea-tecdoc643-openmc`
 **Audited at:** `c45d4b8` — 19 commits ahead of `main`, branch `phase1/geometry-finalization`, **unpushed**
 **Date:** 2026-07-31
@@ -193,19 +198,19 @@ Values read live from the built objects, not from source comments.
 
 | Material | Density basis | Resolved | T (K) | S(α,β) | Provenance |
 |---|---|---|---|---|---|
-| `LEU_U3Si2_Al_fuel` | `sum` of atom densities | 6.25983 g/cm³, Σ = 5.13728E-02 | 332.1 | **none** | atom densities from reference MCNP model; no MT card on either side |
+| `LEU_U3Si2_Al_fuel` | `sum` of atom densities | 6.25983 g/cm³, Σ = 5.13728E-02 | 332.1 | **none** | atom densities from reference MCNP model; no thermal scattering on either side |
 | `Al_6061_cladding` | mass, 2.70 g/cm³ | Σ = 6.026261E-02 | 330.7 | `c_Al27` | pure Al stands in for 6061-T6 |
 | `light_water_294K` | `sum` | 0.99727 g/cm³, Σ = 1.000363E-01 | 294.0 | `c_H_in_H2O` | **H-1 disputed, see F** |
 | `light_water_core_316K` | `sum` | 0.99074 g/cm³, Σ = 9.938134E-02 | 316.8 | `c_H_in_H2O` | — |
-| `B4C control absorber` | `sum` | 2.00000 g/cm³, Σ = 1.093098E-01 | 294.0 | **none** | no MT card in reference model |
-| `graphite_reflector` | **atom/b-cm, 8.724000E-02** | 1.74000 g/cm³ back-computed | 294.0 | `c_Graphite` | `[MCNP]` card m00005 |
+| `B4C control absorber` | `sum` | 2.00000 g/cm³, Σ = 1.093098E-01 | 294.0 | **none** | no thermal scattering in reference model |
+| `graphite_reflector` | **atom/b-cm, 8.724000E-02** | 1.74000 g/cm³ back-computed | 294.0 | `c_Graphite` | `[MCNP]` graphite material definition |
 | `aluminum_structure` | mass, 2.70 g/cm³ | Σ = 6.026261E-02 | 330.7 | `c_Al27` | — |
 | `end_box_homogenized` | `sum` | 1.41806 g/cm³, Σ = 8.960167E-02 | 316.8 | `c_H_in_H2O` **+** `c_Al27` | 0.25 Al / 0.75 H₂O by volume |
 
 Notes:
 
 - `graphite_reflector` is the **only** material specified in atom/b-cm. That is deliberate
-  (it is how card m00005 states it) and removes back-conversion round-off.
+  (it is how the reference MCNP model states it) and removes back-conversion round-off.
 - `Al_6061_cladding` and `aluminum_structure` are **numerically identical** — same density,
   same composition, same temperature, same S(α,β). They differ only in name and figure
   colour. This is intentional but means any tally keyed on one of them silently excludes
@@ -330,7 +335,7 @@ both a comment block and inline.
 | 12 | `N_LAT_X` | 1358 | 6 | **YES** — B4, "reduce it to the 6 (x) × 7 (y) core positions" |
 | 13 | `N_LAT_Y` | 1359 | 7 | **YES** — B4, same |
 | 14 | `POOL_WATER_THICK` | 1365 | 38.5 | **YES** — B4, "38.5 cm of pool water on all four lateral sides `[MCNP]`" |
-| 15 | graphite (materials.py) | 142 | 8.724000E-02 | **YES — strongest in the set.** Kyle supplied card m00005 verbatim |
+| 15 | graphite (materials.py) | 142 | 8.724000E-02 | **YES — strongest in the set.** Kyle supplied the graphite material definition verbatim |
 
 **FINDING 5 — RISK: four `[MCNP]` tags are structural aliases, not confirmations.**
 
@@ -605,7 +610,7 @@ then checking for an `if __name__ == '__main__'` block.
   makes it dangerous: nothing about invoking it signals that it is stale.
 - Its graphite is **1.70 g/cm³** (line 127) — a value that was *never implemented* in the
   production model and has now been superseded twice (1.74, then 8.724000E-02 atom/b-cm from
-  card m00005). Confirmed by running it: `[6] graphite_reflector — 1.7 g/cm3`.
+  the graphite material definition). Confirmed by running it: `[6] graphite_reflector — 1.7 g/cm3`.
 - Its end-box is **1.41975 g/cm³** (line 166) against production's **1.41806** — a
   different homogenization.
 - It carries **no `c_Al27`** on any material, and no `USE_AL_SAB` switch. The Al S(α,β)
@@ -784,8 +789,8 @@ Its working tree is clean; last commit `fc180b9` (2026-07-27 15:46) by Thomas-Mc
 
 | # | Item | Current value | Basis | Blocking on | Impact if wrong |
 |---|---|---|---|---|---|
-| 1 | Graphite S(α,β) MT card | `c_Graphite` applied, 294 K | Our choice; card m00005 snippet has no MT line | **Kyle** | **Large.** Thermal scattering on a reflector materially changes the thermal spectrum. Kyle's snippet proves nothing (MCNP specifies MT separately), so this is genuinely unknown, not merely unconfirmed. |
-| 2 | Aluminium S(α,β) MT card | `c_Al27` on clad, structural Al, blade clad (330.7 K) and end-box Al (316.8 K) | 2026-07-20 meeting decision; Kyle confirmed Al gets S(α,β) | **Kyle** — both-sides change | Moderate. Reference model is also adding it; needs the same MT confirmation as graphite. |
+| 1 | Graphite S(α,β) assignment | `c_Graphite` applied, 294 K | Our choice; the graphite material snippet has no thermal-scattering line | **Kyle** | **Large.** Thermal scattering on a reflector materially changes the thermal spectrum. Kyle's snippet proves nothing (MCNP assigns thermal scattering separately), so this is genuinely unknown, not merely unconfirmed. |
+| 2 | Aluminium S(α,β) assignment | `c_Al27` on clad, structural Al, blade clad (330.7 K) and end-box Al (316.8 K) | 2026-07-20 meeting decision; Kyle confirmed Al gets S(α,β) | **Kyle** — both-sides change | Moderate. Reference model is also adding it; needs the same thermal-scattering confirmation as graphite. |
 | 3 | Depletion zone count | ~~`N_AXIAL_ZONES = 5`~~ → **`N_X_ZONES = 2`, `N_AXIAL_ZONES = 10`** | ~~`[MCNP-VISUAL]`~~ → **`[MCNP — Kyle confirmed 2026-08-12]`** | ~~Kyle~~ **RESOLVED 2026-08-12** | Closed. Reference subdivides each plate 2 × 10; implemented at `01edb31`. See the C5 amendment. |
 | 4 | Uniform zone height | ~~12.0 cm~~ → **6.0 cm** | ~~`[DERIVED, MCNP-VISUAL]`~~ → **`[DERIVED]`** from `MEAT_HEIGHT / N_AXIAL_ZONES` | ~~Kyle~~ **RESOLVED 2026-08-12** | Closed by the 2 × 10 answer. Residual: uniformity was the natural reading of "2 × 10", not a separately confirmed statement — see the C5 amendment. |
 | 5 | Plates share zone material | ~~assumed yes~~ → **NO — materials are per plate** | ~~`[MCNP-VISUAL, inferred]`~~ → **`[MCNP — Kyle confirmed 2026-08-12]`** | ~~Kyle~~ **RESOLVED 2026-08-12** | Closed. Cells and materials now 1:1 (12,280 each). The old scheme was valid OpenMC and a modeling choice, not a bug. |
@@ -982,7 +987,7 @@ every other finding here moot for anyone outside this machine.
 This is the weakest claim in the project. Nineteen constants are justified by `[MCNP]` or
 `[TECDOC]` tags whose backing document — `model_cross_validation.xlsx` — is **not in the
 repository and not on this machine**. The strongest provenance in the entire codebase is
-the graphite density, precisely because Kyle pasted the actual card (`m00005`) and it went
+the graphite density, precisely because Kyle pasted the actual graphite material definition and it went
 into the comment verbatim. Nothing else has that. `CTRL_OUTER_OFFSET = 0.1305` is `[MCNP]`
 on the strength of a value Kyle supplied verbally, which the code itself records "may
 postdate the current state of the reference model" — a tag that means "Kyle confirmed it"
@@ -1008,7 +1013,7 @@ is a spreadsheet row rather than a surface card.
 None of them, and that is by design this phase. The honest position is that Phase 1 matched
 *geometry* to a spreadsheet, and that the k-eff numbers produced along the way are on
 ENDF/B-VIII.0 against VII.0 reference targets, with three material questions open (graphite
-MT card, Al MT card, pool water H-1) and no source-convergence diagnostic ever run. A
+thermal scattering, Al thermal scattering, pool water H-1) and no source-convergence diagnostic ever run. A
 reviewer expecting a validated model will not find one; a reviewer expecting a documented,
 tripwired geometry with its uncertainties enumerated will. The project should be careful to
 present it as the latter.
