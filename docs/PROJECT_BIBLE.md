@@ -2,7 +2,7 @@
 **Generic 10 MW LEU Research Reactor (ANL A-2 design) · Mines × Argonne · ADDER-OpenMC Preparation**
 
 Maintainer: Thomas McCoy (Colorado School of Mines, ME/Nuclear, exp. May 2027; Research Aide, Argonne National Laboratory)
-Last updated: 2026-09-23 · Status: **Task 1 ONGOING.** Fresh-core re-validation on the current geometry is pending; no k-eff result on it is validated.
+Last updated: 2026-10-19 · Status: **Task 1 ONGOING.** Fresh-core re-validation on the current geometry is pending; no k-eff result on it is validated.
 
 This document is the single source of project truth for any collaborator — human or AI. Read it fully before touching the model. **The current code governs**; this document summarizes it and cites `file:line` (paths relative to `model/` unless stated). Where the two disagree, the code wins and this document is stale.
 
@@ -22,12 +22,12 @@ Deliverable destination: `mascovale/CSM-Open-source-Reactor-Model-Library/tree/m
 
 ## 2. Hierarchy of Authority (memorize this)
 
-1. **Kyle Anderson's reference MCNP model** — the governing reference for ALL material and geometry specifications. When the reference MCNP model and TECDOC-643 disagree, the reference MCNP model wins. **Exception:** the rows Kyle has stated are being corrected on the MCNP side (§3, four open items) — there OpenMC governs.
+1. **Kyle Anderson's reference MCNP model** — the governing reference for ALL material and geometry specifications. When the reference MCNP model and TECDOC-643 disagree, the reference MCNP model wins. **Exception:** the rows Kyle has stated are being corrected on the MCNP side (§3, three open items) — there OpenMC governs.
 2. **TECDOC-643 Appendix A-2** (te_643v2_prn.pdf) — geometry/spec source where the reference MCNP model is silent. Kyle's March 9, 2026 email designates A-2 as the core of interest.
 3. **TECDOC-643 Chapter 7 / Appendix G benchmark values** — context only. They use a *different flux-trap treatment* than A-2 Table 1 and are NOT validation targets.
 
 **MCNP-model-vs-document discrepancies already caught and resolved (do not re-litigate):**
-- Absorber is **B₄C, not Hf** (early model error, corrected) — materials.py:120–143.
+- Absorber is **B₄C, not Hf** (early model error, corrected) — materials.py:112–133.
 - Control-element unfueled Al plates: **1.27 mm** [TECDOC A-2 Table 1] (`CTRL_AL_PLATE_THICK = 0.127`, geometry.py:989–994). The reference MCNP model's 1.50 mm is being corrected on the MCNP side. Do not change ours to match.
 - Blade worth: the reference is the MCNP model's **18,540 pcm**. The TECDOC-643 comparison row is Table 7.7 LEU **B₄C**, ANL Monte Carlo, **14.95 ± 0.40 %Δk/k** (20.55 ± 0.55 $) — given in %Δk/k, so no β conversion is involved. It is **context only** (natural B₄C, different flux-trap treatment). **Never** adjust geometry toward the TECDOC value.
 
@@ -37,16 +37,18 @@ Deliverable destination: `mascovale/CSM-Open-source-Reactor-Model-Library/tree/m
 
 **No k-eff result on the current geometry is to be presented as validated.** Fresh-core re-validation on the current geometry is pending.
 
-**Quantity comparison** (`model_cross_validation (6).xlsx`, not in the repo): 78 quantities (51 geometry + 27 material) — **73 MATCH, 5 DIFF**. The 5 DIFF rows are 4 open items, all being resolved on the MCNP side; OpenMC governs:
+**Quantity comparison** (`model_cross_validation (6).xlsx`, not in the repo): 78 quantities (51 geometry + 27 material) — **73 MATCH, 5 DIFF**. The 5 DIFF rows were 4 open items, all being resolved on the MCNP side; OpenMC governs. The outer-pool water pair is now **resolved** (2026-10-19), leaving 3 DIFF rows / 3 open items:
 
 | Quantity | OpenMC (live) | Reference MCNP model |
 |---|---|---|
 | CFE unfueled plate thickness | 0.127 (geometry.py:993) | 0.150 |
 | End-box region X | 7.7, full pitch (geometry.py:117, 163) | 7.6 |
 | End-box region Y | 8.1, full pitch (geometry.py:118, 163) | 8.0 |
-| Outer-pool water H-1 / O-16 | 6.66909e-2 / 3.334545e-2 (materials.py:108–109) | 6.67356e-2 / 3.33678e-2 (0.067 %) |
+| ~~Outer-pool water H-1 / O-16~~ RESOLVED | 6.669090e-2 / 3.334550e-2 (materials.py:100–101) | 6.669090e-2 / 3.334550e-2 (`docs/reference_materials.csv`). OpenMC's O-16 was H1/2 = 3.334545e-2, 1.5e-6 low; now the reference value |
 
-**Spec checks vs TECDOC A-2 Table 1** (`python model/check_u235_mass.py`, all pass): enrichment 19.7501 w/o · U density 4.4500 g/cm³ · U-235 389.69 g/SFE, 288.03 g/CFE · U/Si 1.50001 · meat density 6.2598 g/cm³ (materials.py:59–67).
+**All 8 base materials now match `docs/reference_materials.csv` (from the reference MCNP model)** nuclide-by-nuclide to 1e-6, with matching thermal-scattering presence — `python tests/test_reference_materials.py` (§6).
+
+**Spec checks vs TECDOC A-2 Table 1** (`python model/check_u235_mass.py`, all pass): enrichment 19.7501 w/o · U density 4.4500 g/cm³ · U-235 389.69 g/SFE, 288.03 g/CFE · U/Si 1.50001 · meat density 6.2598 g/cm³ (materials.py:62–70).
 
 **Model envelope:** 123.2 × 133.7 × 180 cm — 38.5 cm of pool water beyond the lattice in x and y (geometry.py:42–43, 1748, 1756–1761).
 
@@ -81,7 +83,7 @@ Five-file modular model. **All runs go through one code path:** `core.build_mode
 | File | Role |
 |---|---|
 | `core.py` | Central driver. `CoreConfig` dataclass = single control surface. Defaults: insertion 100 % (all in), 50,000 × 200 (50 inactive) (core.py:55–60). CLI: `--insertion`, `--particles`, `--batches`, `--inactive`, `--seed`, `--output-dir`, `--overwrite-output`, `--depletion-zoning`, `--deplete`, `--chain-file`, `--power`, `--timesteps`, `--step-days` (core.py:436–464). Output dir is absolute (`<repo>/run_results/core_run`) and a directory holding previous run output is refused without `--overwrite-output` (core.py:86, 258–283). `run_depletion()` is live: `CoupledOperator` + `CECMIntegrator`, solver `cram48`, chain default `endfb81_chain.pwr.xml` in `/beegfs2/data/EP/openmc/data/depletion`; `simplified_*` and fast chains are refused; there is no default step schedule, and the CLI builds uniform steps only (core.py:311–426, 491). `substeps = 4` is recorded but not passed (core.py:129–148). |
-| `materials.py` | 8 base materials (materials.py:510), values from the reference MCNP model, plus 12,280 per-plate zoned fuel clones (2 × 10 zones per plate, materials.py:437–438) when `--depletion-zoning` is on. |
+| `materials.py` | 8 base materials (materials.py:453), atom densities from `docs/reference_materials.csv` (from the reference MCNP model), plus 12,280 per-plate zoned fuel clones (2 × 10 zones per plate, materials.py:380–381) when `--depletion-zoning` is on. |
 | `geometry.py` | Full geometry. `build_core_geometry(withdrawn_fraction, depletion_zoning=False)` is the single construction path (core.py:199). Running `python geometry.py` directly performs self-checks + `geometry_debug` overlap runs at f = 0, 0.5, 0.99 and 1.0 (geometry.py:2272–2400). |
 | `settings.py` | Eigenvalue settings, source box with `constraints={'fissionable': True}`, temperature interpolation (settings.py:182–192, 216). Run statistics come from `CoreConfig`, which overrides settings.py's own values. |
 | `tallies.py` | `build_tallies()` attached by `build_model()`: `flux_map` mesh over the 6 × 7 lattice, 20 cells per pitch, z over the active meat (tallies.py:32–64). |
@@ -117,19 +119,30 @@ Support: `check_u235_mass.py`, `Analyze_rod_sweep.py`, `run/run_rod_sweep.py` (g
 
 ---
 
-## 6. Materials Reference (from the reference MCNP model)
+## 6. Materials Reference
 
-All compositions in **atom fractions / atom densities (atom/b-cm)**. There is **no air** in the model (the July 2026 status slides' materials table listing air is stale).
+**Source: `docs/reference_materials.csv` (from the reference MCNP model)** — one row per nuclide, with each material's temperature and thermal scattering. `tests/test_reference_materials.py` checks every base material against it: each nuclide atom density to 1e-6 relative ("C (natural)" against C12 + C13), no extra nuclides, and thermal-scattering presence (none / Al-27 / H in H2O / graphite).
 
-| Material | Composition | Notes |
+Every base material is `add_nuclide()` at the reference atom density (atom/b-cm) + `set_density('atom/b-cm', N)`, with N = the **sum** of its nuclide densities, so each nuclide is reproduced exactly. There is **no air** in the model (the July 2026 status slides' materials table listing air is stale).
+
+| Material | Composition (atom/b-cm) | Notes |
 |---|---|---|
-| LEU U₃Si₂-Al fuel | U235 2.251800e-03, U238 9.034100e-03, Al27 3.256300e-02, Si28/29/30 6.938766e-03 / 3.524947e-04 / 2.326390e-04 | 332.1 K. **No S(α,β)** (the reference MCNP model has no MT card for it). materials.py:59–67 |
-| B₄C absorber | B10 **1.914973e-02**, B11 **7.010412e-02**, C total 2.005592e-02 split C12 × 0.9893 / C13 × 0.0107 | 294 K; `sum` → 2.000 g/cm³; B:C = 4.45 and B-10 = 21.5 at% of boron, both as given by the MCNP card. No S(α,β). Follow-up commit pending: align the split to OpenMC's 0.988922 / 0.011078. `USE_NATURAL_CARBON = True` switches b4c and graphite to C0 (never exercised). materials.py:19–44, 120–143 |
-| Pool water | H1 6.66909e-02, O16 = H1/2 | 294 K, 0.9975 g/cm³ basis, H-1 + O-16 ONLY, `c_H_in_H2O`. Fills the lateral pool and the axial water beyond \|z\| = 45. DIFF vs MCNP (§3). materials.py:106–111 |
-| Core water | H1 6.625423e-02, O16 = H1/2 | **316.8 K**, 0.9909 g/cm³ basis, `c_H_in_H2O`. All in-core coolant (plate channels, inter-element gaps, flux-trap hole) — not a flux-trap-specific material. materials.py:113–118 |
-| Cladding / structure | Pure Al 2.70 g/cm³ (stands in for 6061-T6 [MCNP]) | 330.7 K. `c_Al27` S(α,β) on clad, structure and end box (`USE_AL_SAB = True`). materials.py:46–50, 75–86, 206–213 |
-| Graphite | **8.724000E-02 atom/b-cm** [MCNP card m00005] | 294 K, `c_Graphite` S(α,β) (MT card open with Kyle). materials.py:191–198 |
-| End-box homog | Card m00004: Al27 1.506565e-02, H1 4.969068e-02, O16 2.484534e-02 | 316.8 K; `sum` → 1.41806 g/cm³; exactly 25 v/o Al / 75 v/o core water; H-1 + O-16 only; `c_H_in_H2O` + `c_Al27`. materials.py:214–240 |
+| `fuel` — LEU U₃Si₂-Al | U235 2.251800e-03, U238 9.034100e-03, Al27 3.256300e-02, Si28/29/30 6.938766e-03 / 3.524947e-04 / 2.326390e-04; N = 5.137280e-02 | 332.1 K. **No S(α,β).** → 6.2598 g/cm³. materials.py:62–70 |
+| `clad` — Al cladding | Al27 6.026260e-02 (pure Al stands in for 6061-T6, as in the reference MCNP model) | 330.7 K. `c_Al27`. Was 2.70 g/cm³ → 6.026261e-02 (2.2e-7 off); now the reference value. materials.py:79–84 |
+| `aluminum` — structural Al | Al27 6.026260e-02 | **330.7 K — still to confirm with Kyle** (§10). `c_Al27`. Side plates, CFE guide plates, flux-trap blocks, blade top clad. materials.py:158–163 |
+| `water` — outer pool | H1 6.669090e-02, O16 3.334550e-02 (the reference value, not H1/2) | 294.0 K, H-1 + O-16 ONLY, `c_H_in_H2O`. Lateral pool box, axial water beyond \|z\| = 45, absorber slot above the blade cap. → 0.99727 g/cm³. materials.py:98–103 |
+| `water_core` — core coolant | H1 6.625423e-02, O16 3.312711e-02 | **316.8 K**, H-1 + O-16 ONLY, `c_H_in_H2O`. All in-core coolant (plate channels, inter-element gaps, flux-trap hole, graphite gaps, slot below the blade). → 0.99074 g/cm³. materials.py:105–110 |
+| `b4c` — B₄C absorber | B10 **1.914973e-02**, B11 **7.010412e-02**, C (natural) 2.005592e-02; N = 1.0930977e-01 | 294.0 K; → 2.000 g/cm³; **no S(α,β)**. B:C = 4.450, B-10 = 21.46 at% of boron, both as given by the reference. Carbon via `add_element('C')`: OpenMC's 0.988922 / 0.011078 split, the SAME as graphite (the old hard-coded 0.9893 / 0.0107 is gone). The reference model's stated N, 1.093098e-01, is the nuclide sum rounded 2.7e-7 high. materials.py:112–133 |
+| `graphite` — reflector | C (natural) **8.724000e-02** | 294.0 K, `c_Graphite` (graphite thermal scattering is in the reference MCNP model). → 1.7400 g/cm³. TECDOC gives no graphite density. materials.py:135–149 |
+| `end_box_homog` — end box | Al27 1.506565e-02, H1 4.969068e-02, O16 2.484534e-02 | 316.8 K; → 1.41806 g/cm³; exactly 25 v/o Al / 75 v/o core water. **`c_H_in_H2O` ONLY** — `c_Al27` removed 2026-10-19 to match the reference. Also fills the moving cap above each blade. materials.py:165–184 |
+
+Carbon: `USE_NATURAL_CARBON = False` (materials.py:47) expands natural carbon to C12/C13 because ENDF/B-VIII.0 has no C0; `True` switches b4c and graphite to C0 together (never exercised). `USE_AL_SAB = True` (materials.py:54) puts `c_Al27` on `clad` and `aluminum` only.
+
+**What sits above each blade** (geometry.py:1357–1395): B₄C → 1 cm `aluminum` top clad → 14 cm `end_box_homog` cap → 294 K `water` to +90, each clipped at CORE_TOP. No side or bottom clad on the blade.
+
+**Not a matched comparison yet:** the thermal-scattering check is presence only. MCNP evaluates each table at its own fixed library temperature; OpenMC interpolates to the material temperature.
+
+Byte-identity after the 2026-10-19 change: `geometry.xml` is unchanged (f = 0 `9081962e…`, f = 1 `79a73a91…`); `materials.xml` moves deliberately `49cde120…` (2,066 B) → `89677292…` (2,204 B).
 
 Temperature treatment: `settings.temperature = {'method': 'interpolation', 'default': 294.0}` (settings.py:216; core.py:95–96). Every material sets its own temperature explicitly; the default (the reference MCNP model's 294 K, not OpenMC's 293.6 K) is a backstop.
 
@@ -159,7 +172,7 @@ Precedence: `OPENMC_CROSS_SECTIONS` env var → `CoreConfig.cross_sections` → 
 
 1. `python geometry.py` self-checks (layer-sum asserts, blade z-range asserts, `geometry_debug` overlap runs at f = 0, 0.5, 0.99, 1.0) — geometry errors are silent in MCNP but loud in OpenMC; use that.
 2. Cross-section geometry plots (`tests/plot_core.py`, `tests/make_phase1_xs_plots.py`) — inspect visually; arithmetic verification alone is not enough (this caught the control-element sprawl).
-3. Coordinate assertions / material dump review; `python model/check_u235_mass.py` (TECDOC spec checks) and `python tests/check_depletion_zoning.py`.
+3. Coordinate assertions / material dump review; `python model/check_u235_mass.py` (TECDOC spec checks), `python tests/test_reference_materials.py` (materials vs the reference MCNP model) and `python tests/check_depletion_zoning.py`.
 4. Short keff tripwire run locally (small particles/batches) — sanity-check magnitude before burning cluster hours.
 5. Full production run on rtrhpc1.
 
@@ -187,19 +200,20 @@ Production statistics baseline: 50,000 particles/batch, 200 batches, 50 inactive
 | Item | Owner/Path |
 |---|---|
 | Matched-library comparison: VII.0 is available on rtrhpc1 as `mcnp_endfb70` but `c_Al27` on it is unverified; otherwise both sides move to one library | Kyle / Thomas |
-| Four MCNP-side DIFF rows (CFE unfueled plate, end-box region X/Y, outer-pool water H-1/O-16) — Kyle's edit; ours must not change to match | Kyle |
+| Three MCNP-side DIFF rows (CFE unfueled plate, end-box region X/Y) — Kyle's edit; ours must not change to match. (Outer-pool water H-1/O-16: CLOSED 2026-10-19, §3) | Kyle |
 | Confirm `CTRL_OUTER_OFFSET = 0.1305` is in the MCNP surface cards, not only the report figure | Kyle |
-| Graphite and Al MT (S(α,β)) cards on the MCNP side | Kyle |
+| ~~Graphite and Al thermal scattering on the MCNP side~~ CLOSED 2026-10-19: the reference MCNP model carries graphite and Al-27 thermal scattering, on graphite and on the two pure-Al materials only (not the end box) (§6) | — |
+| `Downloads/iaeac000` is an older reference MCNP model version (no Al thermal scattering, different thermal-scattering temperatures, 100 fuel cells/plate) — confirm with Kyle; structural Al temperature still to confirm | Kyle / Thomas |
 | Confirm which flux-trap configuration is the benchmark reference (A-2 Table 1 vs. Ch. 7/App. G) | Kyle |
 | Shannon entropy mesh — none defined; needed before results are published | Thomas |
 | Fresh-core re-validation on the current geometry | Thomas |
 | 15348 k-eff and crossing (§3a) | Thomas |
 | Commit rtrhpc1 `core.py` `_SCHEDULES` and `openmc_submit.pbs` to main; main's CLI (uniform steps only, core.py:491) cannot reproduce these runs | Thomas |
 | OpenMC 0.16.0 upgrade for `substeps` (CECM); equivalence to ADDER's substep unconfirmed (core.py:129–148) | Thomas / Kyle |
-| Align b4c C12/C13 split to OpenMC's 0.988922 / 0.011078 (materials.py:40, 141–142); changes materials.xml | Thomas |
+| ~~Align b4c C12/C13 split to OpenMC's 0.988922 / 0.011078~~ CLOSED 2026-10-19: b4c and graphite both use `add_element('C')` (materials.py:132, 147) | — |
 | `run_vii_mat.py` rewrite: import from `materials.py`, override only the library switch | Thomas |
 | `Analyze_rod_sweep.py:16–41` compares against TECDOC LEU Hf 15.22 $; the TECDOC context row is B₄C 14.95 %Δk/k (§2) | Thomas |
-| Stale code comments: core.py:39 (Slurm), core.py:11 (`openmc-env`), core.py:94 and settings.py:213 ("flux-trap water"), core.py:105–107 and materials.py:47–49 (library basis — depletion uses VIII.1), materials.py:91–98 (pool-water placement; geometry.py governs) | Thomas |
+| Stale code comments: core.py:39 (Slurm), core.py:11 (`openmc-env`), core.py:94 and settings.py:213 ("flux-trap water"), core.py:105–107 and materials.py:52–53 (library basis — depletion uses VIII.1). (materials.py pool-water placement: fixed 2026-10-19) | Thomas |
 | Publish model to `mascovale/CSM-Open-source-Reactor-Model-Library` — `scripts/sync_deliverable.sh` (dry run by default) | Thomas |
 | Tasks 2 & 3 (CPU/GPU runtime; conversion-tool assessment) | Downstream |
 
