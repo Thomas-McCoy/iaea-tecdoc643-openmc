@@ -7,7 +7,8 @@
 #                (M-PRISM-Colorado-School-of-Mines/CSM-Open-source-Reactor-Model-Library;
 #                 moved from mascovale/ 2026-10-19)
 #
-# RUN IT FROM A CLEAN CHECKOUT (e.g. a `git worktree` of the commit to ship).
+# RUN IT FROM A CLEAN CHECKOUT (a `git worktree` or local clone of the commit
+# to ship).
 # rsync copies whatever is on disk, and untracked directories that no
 # exclusion names (tools/, viz_out/, .claude/ ...) would ship from a working
 # tree. The uncommitted-changes check below only sees tracked files.
@@ -46,7 +47,7 @@ while [[ $# -gt 0 ]]; do
         --write)  WRITE=1; shift ;;
         --dry-run) WRITE=0; shift ;;
         --dest)   DEST="$2"; shift 2 ;;
-        -h|--help) sed -n '2,36p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
+        -h|--help) sed -n '2,37p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
@@ -94,7 +95,9 @@ EXCLUDES=(
     '*.out'
 
     # --- vcs / tooling ---------------------------------------------------------
-    '.git/'
+    '.git'                      # NOT '.git/': in a worktree .git is a FILE,
+                                # and shipping it makes the destination a
+                                # worktree of the dev repo
     '.gitignore'                # the deliverable keeps its own
     '__pycache__/'
     '*.py[cod]'
