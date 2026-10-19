@@ -99,6 +99,11 @@ EXCLUDES=(
                                 # and shipping it makes the destination a
                                 # worktree of the dev repo
     '.gitignore'                # the deliverable keeps its own
+    '/README.md'                # same: the deliverable's README is Valerio's;
+                                # the dev README is empty (leading / = top
+                                # level only)
+    '/analysis/'                # cluster-specific, not reviewed for the
+                                # deliverable; excluded for now
     '__pycache__/'
     '*.py[cod]'
     '.pytest_cache/'
