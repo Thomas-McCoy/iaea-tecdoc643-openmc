@@ -3,8 +3,14 @@
 # sync_deliverable.sh — push the dev tree to the public deliverable repo.
 #
 #   dev:         ~/iaea-tecdoc643-openmc            (Thomas-McCoy/iaea-tecdoc643-openmc)
-#   deliverable: ~/CSM-Open-source-Reactor-Model-Library/IAEA-Tecdoc-Core
-#                (mascovale/CSM-Open-source-Reactor-Model-Library)
+#   deliverable: ~/CSM-Open-source-Reactor-Model-Library/iaea-tecdoc-core
+#                (M-PRISM-Colorado-School-of-Mines/CSM-Open-source-Reactor-Model-Library;
+#                 moved from mascovale/ 2026-10-19)
+#
+# RUN IT FROM A CLEAN CHECKOUT (e.g. a `git worktree` of the commit to ship).
+# rsync copies whatever is on disk, and untracked directories that no
+# exclusion names (tools/, viz_out/, .claude/ ...) would ship from a working
+# tree. The uncommitted-changes check below only sees tracked files.
 #
 # WHY THIS EXISTS
 #
@@ -32,7 +38,7 @@
 set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEST="${HOME}/CSM-Open-source-Reactor-Model-Library/IAEA-Tecdoc-Core"
+DEST="${HOME}/CSM-Open-source-Reactor-Model-Library/iaea-tecdoc-core"
 WRITE=0
 
 while [[ $# -gt 0 ]]; do
@@ -40,7 +46,7 @@ while [[ $# -gt 0 ]]; do
         --write)  WRITE=1; shift ;;
         --dry-run) WRITE=0; shift ;;
         --dest)   DEST="$2"; shift 2 ;;
-        -h|--help) sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
+        -h|--help) sed -n '2,36p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
@@ -49,11 +55,21 @@ done
 # EXCLUSIONS — SUPERSEDED_NOTES.md section 5. Keep the two lists in step.
 #
 # The deliverable is THE MODEL, not the engineering record.
+#
+# INCLUDES are passed BEFORE the exclusions (rsync: first matching rule wins).
+# They carve the one file the model itself depends on out of docs/:
+# reference_materials.csv is the source of record that materials.py cites and
+# tests/test_reference_materials.py reads.
 # -----------------------------------------------------------------------------
+INCLUDES=(
+    'docs/'
+    'docs/reference_materials.csv'
+)
 EXCLUDES=(
     # --- engineering record, never ships -------------------------------------
-    'docs/'                     # PHASE1_AUDIT.md, SUPERSEDED_NOTES.md — internal
+    'docs/*'                    # PHASE1_AUDIT.md, SUPERSEDED_NOTES.md — internal
                                 # audit, open questions, provenance weaknesses
+                                # (everything in docs/ except the INCLUDES)
     'PROJECT_BIBLE.md'          # standing rule; confirmed absent, keep it so
     'TESTAMENT_*.md'            # same class
 
@@ -62,6 +78,9 @@ EXCLUDES=(
                                 # graphite 1.70, end-box 1.41975, no c_Al27.
                                 # Publishing it is worse than publishing nothing.
                                 # Remove this line once the rewrite lands.
+    'model/BENCHMARK_DIMENSIONS.md'  # stale (Hf blade, 0.1075 CFE offset,
+                                     # graphite 1.70, 15 cm cap); excluded until
+                                     # rewritten (PROJECT_BIBLE §10)
 
     # --- generated output ------------------------------------------------------
     'plots/'                    # nothing tracked since 4a76220; generators ship
@@ -86,6 +105,7 @@ EXCLUDES=(
 )
 
 RSYNC_ARGS=(-av --delete)
+for i in "${INCLUDES[@]}"; do RSYNC_ARGS+=(--include "$i"); done
 for e in "${EXCLUDES[@]}"; do RSYNC_ARGS+=(--exclude "$e"); done
 
 echo "=============================================================="

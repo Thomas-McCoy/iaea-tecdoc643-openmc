@@ -109,7 +109,7 @@ not been resolved as of this writing.
 Two related 2026-07-20 meeting decisions, in `materials.py` (not a dimension
 table entry, noted here for provenance tracking):
 - Graphite reflector density set to **1.7000 g/cm³** [TECDOC] (replaces the
-  deck-implied ~1.740 g/cm³ atom-density spec).
+  ~1.740 g/cm³ implied by the reference MCNP model's atom-density spec).
 - Al-27 thermal scattering (`c_Al27` S(a,b)) enabled (`USE_AL_SAB = True`) on
   clad, structural aluminum, and `end_box_homog`, gated on the active
   cross-section library providing `c_Al27` (ENDF/B-VIII.0 does; VII.0 does not).

@@ -9,11 +9,8 @@ For each material in the CSV:
     compared against OpenMC's C12 + C13 (or C0 if USE_NATURAL_CARBON);
   * the material carries no nuclide the CSV does not list;
   * thermal scattering matches: none / Al-27 / H in H2O / graphite;
+  * temperature matches (K);
   * every material in materials.materials appears in the CSV, and vice versa.
-
-Temperatures are NOT asserted: the CSV records them, and a mismatch is
-printed as a note, because structural aluminum's 330.7 K is still open
-(PROJECT_BIBLE §10).
 
 Runs under pytest, or directly: python tests/test_reference_materials.py
 (exits non-zero on failure).
@@ -115,26 +112,27 @@ def test_thermal_scattering():
     assert not bad, '\n'.join(bad)
 
 
-def temperature_notes():
-    return [f"{name}: model {MODEL[name].temperature} K, reference "
-            f"{ref['temperature']} K"
-            for name, ref in REFERENCE.items()
-            if abs(MODEL[name].temperature - ref['temperature']) > 1e-9]
+def test_temperature():
+    bad = [f"{name}: model {MODEL[name].temperature} K, reference "
+           f"{ref['temperature']} K"
+           for name, ref in REFERENCE.items()
+           if MODEL[name].temperature is None
+           or abs(MODEL[name].temperature - ref['temperature']) > 1e-9]
+    assert not bad, '\n'.join(bad)
 
 
 if __name__ == '__main__':
     failures = 0
     for test in (test_every_model_material_is_in_the_reference,
                  test_nuclide_atom_densities,
-                 test_thermal_scattering):
+                 test_thermal_scattering,
+                 test_temperature):
         try:
             test()
             print(f"PASS  {test.__name__}")
         except AssertionError as exc:
             failures += 1
             print(f"FAIL  {test.__name__}\n{exc}")
-    for note in temperature_notes():
-        print(f"NOTE  temperature differs: {note}")
     n_nuc = sum(len(r['nuclides']) for r in REFERENCE.values())
     print(f"{len(REFERENCE)} materials, {n_nuc} reference nuclide rows")
     sys.exit(1 if failures else 0)

@@ -15,6 +15,6 @@ graphite,graphite reflector,294.0,graphite,C (natural),8.724000e-02
 b4c,B4C absorber,294.0,none,B10,1.914973e-02
 b4c,B4C absorber,294.0,none,B11,7.010412e-02
 b4c,B4C absorber,294.0,none,C (natural),2.005592e-02
-aluminum,structural aluminum,330.7,Al-27,Al27,6.026260e-02
+aluminum,structural aluminum,294.0,Al-27,Al27,6.026260e-02
 water,outer pool water,294.0,H in H2O,H1,6.669090e-02
 water,outer pool water,294.0,H in H2O,O16,3.334550e-02

@@ -25,9 +25,7 @@ import openmc
 # Every base material is written the same way: add_nuclide() with the
 # reference atom density (atom/b-cm), then set_density('atom/b-cm', N) with
 # N = the SUM of those nuclide densities, so each one is reproduced exactly.
-#
-# Structural aluminum's 330.7 K is still to be confirmed with Kyle
-# (PROJECT_BIBLE §10).
+# Temperatures are the reference values too; the test checks them.
 # =============================================================================
 
 # Natural carbon (C0) vs. OpenMC's natural C12/C13 expansion.
@@ -151,12 +149,12 @@ graphite.add_s_alpha_beta('c_Graphite')
 # =============================================================================
 # STRUCTURAL ALUMINUM
 # Side plates, CFE guide plates, flux-trap blocks, blade top clad. Same
-# composition as clad. TEMPERATURE 330.7 K is still to be confirmed with
-# Kyle (PROJECT_BIBLE §10).
+# composition as clad, but at 294.0 K, the reference MCNP model's structural
+# aluminum temperature (it was 330.7 K, the cladding value, until 2026-10-19).
 # =============================================================================
 
 aluminum = openmc.Material(name='aluminum_structure')
-aluminum.temperature = 330.7
+aluminum.temperature = 294.0
 aluminum.add_nuclide('Al27', 6.026260E-02)
 aluminum.set_density('atom/b-cm', 6.026260E-02)
 if USE_AL_SAB:
